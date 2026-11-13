@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+httpx
+python-multipart
+supabase
+python-dotenv
+pytest
+# Optional: runs the database integration tests against a local PostgreSQL
+# psycopg[binary]
