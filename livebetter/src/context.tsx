@@ -2,11 +2,12 @@ import React,{createContext,useCallback,useContext,useEffect,useMemo,useState} f
 import {ApiError,DEMO_MODE,ParsedReceipt,categoryParams,clearSession,getSession,loadSession,newOperationId,request,routes,saveSession,uploadImage} from './api';
 import {getRecipes,loadDemo,mockForecast,mockInsights,mockScenario,putBill,putCooking,putHousehold,putPantry,putReceipt,resetDemo,saveDemo} from './mock';
 import {Plan} from './types';
+import {Lang,getLang,loadLang,saveLang} from './i18n';
 import {AIRecipe,Explanation,Habits,ParsedBill,RecipeMatch,RecognisedItem} from './types';
 import {Activity,AuthenticatorSetup,Bill,CoachReply,Forecast,Household,Insight,LoginResult,PantryItem,ReceiptItem,Recipe,ResetStatus,Scenario,SecurityStatus,SensitiveAction,Snapshot,UtilityKind} from './types';
 
 type Context={
-  ready:boolean;busy:boolean; demo:boolean; state:Snapshot; error:string|null; signedIn:boolean;
+  ready:boolean;busy:boolean; demo:boolean; lang:Lang; setLanguage:(l:Lang)=>Promise<void>; state:Snapshot; error:string|null; signedIn:boolean;
   clearError:()=>void; clearDemo:()=>Promise<void>;
   login:(email:string,password:string)=>Promise<LoginResult>;
   loginCode:(mfaToken:string,code:string,recovery?:boolean)=>Promise<LoginResult>;
@@ -68,6 +69,8 @@ export function AppProvider({children}:{children:React.ReactNode}){
   const [state,setState]=useState<Snapshot>(empty);const [ready,setReady]=useState(false);
   const [busy,setBusy]=useState(false);const [error,setError]=useState<string|null>(null);
   const [signedIn,setSignedIn]=useState(false);
+  const [lang,setLang]=useState<Lang>(getLang());
+  const setLanguage=useCallback(async(l:Lang)=>{await saveLang(l);setLang(l);},[]);
 
   // ---- live mode: load everything the screens show from the backend ----
   const loadLive=useCallback(async()=>{
@@ -86,6 +89,7 @@ export function AppProvider({children}:{children:React.ReactNode}){
   useEffect(()=>{
     (async()=>{
       try{
+        setLang(await loadLang());
         if(DEMO_MODE){setState(await loadDemo());return;}
         const s=await loadSession();
         if(s.token){setSignedIn(true);await loadLive();}
@@ -220,7 +224,7 @@ export function AppProvider({children}:{children:React.ReactNode}){
   };
   const ask=async(message:string)=>{
     if(DEMO_MODE)throw Error('demo');
-    const r=await request<CoachReply>(routes.coach,'POST',{message,language:'en'});
+    const r=await request<CoachReply>(routes.coach,'POST',{message,language:getLang()});
     loadLive().catch(()=>undefined);
     return r;
   };
@@ -250,7 +254,7 @@ export function AppProvider({children}:{children:React.ReactNode}){
 
   // ---- redesign: every screen below calls a backend route ----
   const parseBill=async(kind:UtilityKind,uri:string)=>{live();return uploadImage<ParsedBill>(routes.parseBill,uri,{kind});};
-  const explain=useCallback(async(kind:UtilityKind)=>{live();return request<Explanation>(`${routes.explain}?category=${kind}`);},[]);
+  const explain=useCallback(async(kind:UtilityKind)=>{live();return request<Explanation>(`${routes.explain}?category=${kind}&lang=${getLang()}`);},[]);
   const habits=useCallback(async(kind:UtilityKind)=>{live();return request<Habits>(`${routes.habits}/${kind}`);},[]);
   const saveHabits=async(kind:UtilityKind,answers:Record<string,any>)=>{live();let out:Habits|null=null;
     await execute(async()=>{out=await request<Habits>(`${routes.habits}/${kind}`,'PUT',answers);await loadLive();});
@@ -262,18 +266,18 @@ export function AppProvider({children}:{children:React.ReactNode}){
     return (await request<{matches:RecipeMatch[]}>(routes.searchRecipes,'POST',{ingredients})).matches;};
   const generateRecipe=async(ingredients:string[])=>{live();return request<AIRecipe>(routes.generateRecipe,'POST',{ingredients});};
   const applyPlan=async(question:string)=>{live();
-    const r=await request<CoachReply>('/household/coach/apply','POST',{question});loadLive().catch(()=>undefined);return r;};
+    const r=await request<CoachReply>('/household/coach/apply','POST',{question,language:getLang()});loadLive().catch(()=>undefined);return r;};
   const plans=useCallback(async()=>{live();return request<Plan[]>('/household/plans');},[]);
   const saveRecipe=async(recipe:AIRecipe['recipe'])=>{live();let id='';
     await execute(async()=>{id=(await request<{recipe_id:string}>(routes.drafts,'POST',{recipe})).recipe_id;});
     return id;};
-  const value=useMemo(()=>({ready,busy,demo:DEMO_MODE,state,error,signedIn,clearError:()=>setError(null),clearDemo,
+  const value=useMemo(()=>({ready,busy,demo:DEMO_MODE,lang,setLanguage,state,error,signedIn,clearError:()=>setError(null),clearDemo,
     login,loginCode,signup,logout,loadSample,refreshAll,onboard,deleteBill,addBill,addItem,confirmReceipt,parseReceipt,forecast,
     insights,recipes,cook,scenario,ask,refreshPantry,securityStatus,setPattern,verifyPattern,authenticatorSetup,
     authenticatorConfirm,authenticatorDisable,resetAccount,restoreAccount,resetStatus,parseBill,explain,habits,saveHabits,
     recognizeFood,describeFood,searchRecipes,generateRecipe,saveRecipe,applyPlan,plans}),
     // Event handlers bind the latest state each render.
-    [ready,busy,state,error,signedIn]);
+    [ready,busy,state,error,signedIn,lang]);
   // Screens mount only after the saved login is loaded, so their first requests carry the token.
   return <Ctx.Provider value={value}>{ready?children:null}</Ctx.Provider>;
 }

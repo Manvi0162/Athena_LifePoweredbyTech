@@ -323,6 +323,21 @@ def household_scenarios(body: UIScenario):
 # ---------------- Big Brain ----------------
 class ApplyIn(BaseModel):
     question: str = Field(min_length=1, max_length=500)
+    language: str = "en"
+
+
+def _translate_fields(result, language):
+    """French / Kreol: the suggestion and the 'applied' message are worded by Gemini in that language, kept only if
+    every number stays exactly the same (same check as the coach answer). Without a key they stay in English."""
+    if language not in ("fr", "mfe"):
+        return result
+    from big_brain import coach as C
+    for field in ("suggestion", "applied_message"):
+        if result.get(field):
+            out = C.rephrase({"answer": result[field]}, language)
+            if out.get("source") == "gemini":
+                result[field] = out["answer"]
+    return result
 
 
 @router.post("/household/coach/apply")
@@ -330,7 +345,7 @@ def coach_apply(body: ApplyIn):
     """The Apply button under a what-if answer: recalculated on the server (client numbers are not trusted)."""
     from big_brain import whatif
     ctx, h = require_household()
-    return whatif.apply_plan(ctx, h, body.question)
+    return _translate_fields(whatif.apply_plan(ctx, h, body.question), body.language)
 
 
 @router.get("/household/plans")
@@ -386,6 +401,7 @@ def coach(body: CoachIn):
     else:
         result = whatif.answer(h, body.message)
     result = C.rephrase(result, body.language)
+    result = _translate_fields(result, body.language)
     ctx.db.table("activity_logs").insert({"household_id": h["id"], "event_type": "coach.question",
                                           "details": {"module": "big_brain", "intent": result["intent"], "question": body.message[:200],
                                                       "source": result["source"]}}).execute()

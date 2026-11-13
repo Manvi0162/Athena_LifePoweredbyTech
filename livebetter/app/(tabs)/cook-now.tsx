@@ -2,6 +2,7 @@
 // -> none? AI creates one (clearly labelled) -> save it -> choose a recipe -> confirm cooking -> stock goes down.
 // Backend: /food/recognize, /food/describe, /recipes/search, /recipes/generate, /recipes/drafts, /recipes/{id}/cook.
 import React,{useState} from 'react';
+import {t} from '../../src/i18n';
 import {ActivityIndicator,Alert,Image,Pressable,Text,View} from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import {router} from 'expo-router';
@@ -26,12 +27,12 @@ export default function CookNow(){
   function resetAfter(){setMatches(null);setAi(null);setSavedId(null);setMsg(null);}
   async function pick(camera:boolean){
     try{
-      if(camera){const p=await ImagePicker.requestCameraPermissionsAsync();if(!p.granted)return Alert.alert('Permission','Allow camera access.');}
+      if(camera){const p=await ImagePicker.requestCameraPermissionsAsync();if(!p.granted)return Alert.alert(t('Permission'),t('Allow camera access.'));}
       const r=camera?await ImagePicker.launchCameraAsync({mediaTypes:['images'],quality:.6}):
         await ImagePicker.launchImageLibraryAsync({mediaTypes:['images'],quality:.6});
       if(r.canceled)return;
       setPhoto(r.assets[0].uri);setItems([]);setName('');setAbout(null);resetAfter();
-      if(app.demo){setMsg({text:'Demo mode: type the ingredient name below.'});return;}
+      if(app.demo){setMsg({text:t('Demo mode: type the ingredient name below.')});return;}
       setStep('Recognising your ingredient…');
       const out=await app.recognizeFood(r.assets[0].uri);
       setItems(out.items);
@@ -45,7 +46,7 @@ export default function CookNow(){
     try{setAbout(await app.describeFood(item));}catch{setAbout(null);}
   }
   async function find(){
-    if(!name.trim())return setMsg({text:'Scan or type the ingredient first.',bad:true});
+    if(!name.trim())return setMsg({text:t('Scan or type the ingredient first.'),bad:true});
     resetAfter();setStep('Searching all recipes…');
     try{setMatches(await app.searchRecipes([name.trim()]));}
     catch(e){setMsg({text:readError(e),bad:true});setStep(null);return;}
@@ -74,66 +75,66 @@ export default function CookNow(){
   async function save(){
     if(!ai)return;
     try{const id=await app.saveRecipe(ai.recipe);setSavedId(id);
-      setMsg({text:'Saved to your recipes (private, marked AI-generated). You can cook it now.'});}
+      setMsg({text:t('Saved to your recipes (private, marked AI-generated). You can cook it now.')});}
     catch(e){setMsg({text:readError(e),bad:true});}
   }
   const open=(id:string)=>router.push({pathname:'/recipe/[id]',params:{id}});
 
-  return <Page back title="Cook with something now" subtitle="Scan the ingredient you want to use. We find a recipe for it.">
-    <Btn title="📖 View my recipes" outline onPress={()=>router.push('/my-recipes')}/>
+  return <Page back title={t('Cook with something now')} subtitle={t('Scan the ingredient you want to use. We find a recipe for it.')}>
+    <Btn title={t('📖 View my recipes')} outline onPress={()=>router.push('/my-recipes')}/>
     <Card>
-      <Label>1 · Scan the ingredient</Label>
+      <Label>{t('1 · Scan the ingredient')}</Label>
       <View style={S.row}>
-        <View style={{flex:1}}><Btn title="📷 Camera" onPress={()=>void pick(true)}/></View>
-        <View style={{flex:1}}><Btn title="Upload photo" outline onPress={()=>void pick(false)}/></View>
+        <View style={{flex:1}}><Btn title={t('📷 Camera')} onPress={()=>void pick(true)}/></View>
+        <View style={{flex:1}}><Btn title={t('Upload photo')} outline onPress={()=>void pick(false)}/></View>
       </View>
       {photo?<Image source={{uri:photo}} style={{height:160,borderRadius:12}} resizeMode="contain"/>:null}
       {items.length>1?<View style={S.choiceRow}>{items.map(i=><Pressable key={i.name} accessibilityRole="button" onPress={()=>void choose(i)}
         style={[S.choice,name===i.name&&S.choiceSelected]}><Text style={[S.choiceText,name===i.name&&S.choiceTextSelected]}>
           {i.name} · {Math.round(i.confidence*100)}%</Text></Pressable>)}</View>:null}
-      <Field label="Ingredient (correct it if needed)" value={name} onChangeText={v=>{setName(v);setAbout(null);resetAfter();}} placeholder="e.g. tomato"/>
+      <Field label={t('Ingredient (correct it if needed)')} value={name} onChangeText={v=>{setName(v);setAbout(null);resetAfter();}} placeholder={t('e.g. tomato')}/>
       {about?<View style={{backgroundColor:C.softBlue,borderRadius:12,padding:11,gap:3}}>
-        <Text style={S.title}>What it is</Text><Text style={S.body}>{about}</Text>
-        {items[0]?.low_confidence?<Note>Not fully sure: please check the name.</Note>:null}
+        <Text style={S.title}>{t('What it is')}</Text><Text style={S.body}>{about}</Text>
+        {items[0]?.low_confidence?<Note>{t('Not fully sure: please check the name.')}</Note>:null}
       </View>:null}
-      <Btn title="2 · Find recipes with it" onPress={()=>void find()} disabled={!name.trim()}/>
+      <Btn title={t('2 · Find recipes with it')} onPress={()=>void find()} disabled={!name.trim()}/>
     </Card>
 
     {step?<View style={S.row}><ActivityIndicator color={C.green}/><Note>{step}</Note></View>:null}
     {msg?<Text style={msg.bad?S.error:[S.card,{color:C.green,fontWeight:'700'}]}>{msg.text}</Text>:null}
 
     {matches?<Card>
-      <Label>From our recipe database</Label>
+      <Label>{t('From our recipe database')}</Label>
       {matches.length?matches.map(m=><Pressable key={m.recipe_id} accessibilityRole="button" onPress={()=>open(m.recipe_id)}
         style={{paddingVertical:10,borderTopWidth:1,borderTopColor:C.line,gap:2}}>
         <View style={S.between}><Text style={[S.title,{flex:1}]}>{m.name}</Text><Text style={{color:C.green,fontSize:19}}>›</Text></View>
-        <Note>{m.verification_status==='pending'?'AI-generated · ':''}{m.already_in_pantry.length?`You have: ${m.already_in_pantry.join(', ')}. `:''}
+        <Note>{m.verification_status==='pending'?t('AI-generated · '):''}{m.already_in_pantry.length?`You have: ${m.already_in_pantry.join(', ')}. `:''}
           {m.still_to_buy.length?`Not in your pantry: ${m.still_to_buy.join(', ')}.`:'Everything else is in your pantry.'}</Note>
-      </Pressable>):<Note>No recipe in the database uses it yet.</Note>}
-      {!ai?<Btn title="Create a recipe with AI" outline onPress={()=>void create()}/>:null}
+      </Pressable>):<Note>{t('No recipe in the database uses it yet.')}</Note>}
+      {!ai?<Btn title={t('Create a recipe with AI')} outline onPress={()=>void create()}/>:null}
     </Card>:null}
 
     {ai?<Card>
-      <Label>AI-generated for you</Label>
+      <Label>{t('AI-generated for you')}</Label>
       <View style={{backgroundColor:C.amber,borderRadius:12,padding:11,gap:3}}>
-        <Text style={[S.title,{color:'#8A5A00'}]}>⚠ AI-generated recipe</Text>
+        <Text style={[S.title,{color:'#8A5A00'}]}>{t('⚠ AI-generated recipe')}</Text>
         <Text style={[S.muted,{color:'#8A5A00'}]}>{ai.warning}</Text>
       </View>
       <Text style={S.h2}>{ai.recipe.name}</Text>
       {ai.recipe.description?<Text style={S.body}>{ai.recipe.description}</Text>:null}
       <Note>{ai.recipe.servings?`${ai.recipe.servings} servings · `:''}{ai.recipe.prep_minutes!=null?`${ai.recipe.prep_minutes} min prep · `:''}{ai.recipe.cook_minutes!=null?`${ai.recipe.cook_minutes} min cooking`:''}</Note>
-      <Text style={S.title}>Ingredients</Text>
+      <Text style={S.title}>{t('Ingredients')}</Text>
       {ai.recipe.ingredients.map((i,k)=><View key={k} style={S.between}>
         <Text style={S.body}>{i.ingredient_name}{i.optional?' (optional)':''}</Text>
         <Text style={[S.title,{color:ai.missing.some(m=>m.startsWith(i.ingredient_name))?C.muted:C.green}]}>{i.quantity??''} {i.unit??''}</Text></View>)}
       {ai.missing.length?<Note>Not in your pantry: {ai.missing.join(', ')}</Note>:null}
-      <Text style={S.title}>Steps</Text>
+      <Text style={S.title}>{t('Steps')}</Text>
       {ai.recipe.instructions.map((t,k)=><Text key={k} style={S.body}>{k+1}. {t}</Text>)}
-      <Btn title={cooking?'Updating your pantry…':'Use this recipe · I cooked it ✓'} disabled={cooking} onPress={()=>void cookAi()}/>
-      <Note>Cooking it lowers the ingredients in your pantry list. It never adds a grocery expense.</Note>
-      {savedId?<Text style={[S.muted,{color:C.green,fontWeight:'700'}]}>✓ Saved in My recipes</Text>:
-        <Btn title="Save to my recipes" outline onPress={()=>void save()}/>}
-      <Btn title="Try another AI recipe" outline onPress={()=>void create()}/>
+      <Btn title={cooking?t('Updating your pantry…'):t('Use this recipe · I cooked it ✓')} disabled={cooking} onPress={()=>void cookAi()}/>
+      <Note>{t('Cooking it lowers the ingredients in your pantry list. It never adds a grocery expense.')}</Note>
+      {savedId?<Text style={[S.muted,{color:C.green,fontWeight:'700'}]}>{t('✓ Saved in My recipes')}</Text>:
+        <Btn title={t('Save to my recipes')} outline onPress={()=>void save()}/>}
+      <Btn title={t('Try another AI recipe')} outline onPress={()=>void create()}/>
     </Card>:null}
   </Page>;
 }

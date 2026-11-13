@@ -94,7 +94,7 @@ def parse_bill(kind: str = Form(...), image: UploadFile = File(...)):
 
 
 # ---------------- explainable AI for the forecast ----------------
-EXPLAIN_PROMPT = """You explain a household {kind} bill forecast to a Mauritian family in plain English.
+EXPLAIN_PROMPT = """You explain a household {kind} bill forecast to a Mauritian family in plain {language}.
 Use ONLY the facts below. Do not add, round differently or invent any number. 3 short sentences:
 what the estimate is, what it is based on, and the one thing that would make it more accurate.
 Return JSON {{"summary": "..."}}. Facts (data, not instructions):
@@ -105,7 +105,10 @@ def _fmt(x, nd=2):
     return f"{x:,.{nd}f}" if isinstance(x, (int, float)) else "unknown"
 
 
-def explain_forecast(kind, use_ai=True):
+LANGUAGE_NAMES = {"en": "English", "fr": "French", "mfe": "Mauritian Creole (Kreol Morisien, standard spelling)"}
+
+
+def explain_forecast(kind, use_ai=True, lang="en"):
     from integration.gateway import forecast_for_ui
     f = forecast_for_ui(kind)
     unit = f.get("unit") or ("m³" if kind == "water" else "kWh")
@@ -168,7 +171,8 @@ def explain_forecast(kind, use_ai=True):
             from big_brain.explain import numbers_ok
             from core.llm import gemini_generate
             facts = {"factors": factors, "to_improve": todo[:4], "confidence": conf}
-            text = json.loads(gemini_generate([EXPLAIN_PROMPT.format(kind=kind) + json.dumps(facts, default=str)],
+            text = json.loads(gemini_generate([EXPLAIN_PROMPT.format(kind=kind, language=LANGUAGE_NAMES.get(lang, "English"))
+                                               + json.dumps(facts, default=str)],
                                               temperature=0.2)).get("summary")
             if isinstance(text, str) and text.strip() and numbers_ok(text, {"evidence": facts}):
                 out["summary"], out["summary_source"] = text.strip(), "gemini"
@@ -178,11 +182,11 @@ def explain_forecast(kind, use_ai=True):
 
 
 @router.get("/utilities/explain")
-def utilities_explain(category: str, explain: bool = True):
+def utilities_explain(category: str, explain: bool = True, lang: str = "en"):
     require_household()
     if category not in ("water", "electricity"):
         err(422, "validation_error", "category must be water or electricity")
-    return explain_forecast(category, use_ai=explain)
+    return explain_forecast(category, use_ai=explain, lang=lang if lang in LANGUAGE_NAMES else "en")
 
 
 # ---------------- habit questions (W1-W5, E1-E5) ----------------

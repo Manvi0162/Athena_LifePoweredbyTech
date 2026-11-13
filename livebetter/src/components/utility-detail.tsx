@@ -1,4 +1,5 @@
 import React,{useEffect,useMemo,useState} from 'react';
+import {t} from '../i18n';
 import {ActivityIndicator,Alert,Pressable,Text,View} from 'react-native';
 import {router} from 'expo-router';
 import {useApp} from '../context';
@@ -34,21 +35,21 @@ export function UtilityDetail({kind}:{kind:UtilityKind}){
 
   const remove=(id:string)=>{
     const bill=bills.find(b=>b.id===id);if(!bill)return;
-    guard.ask('delete_bill',async t=>{try{await deleteBill(bill,t);}catch(e){Alert.alert('Not deleted',readError(e));}});
+    guard.ask('delete_bill',async tok=>{try{await deleteBill(bill,tok);}catch(e){Alert.alert(t('Not deleted'),readError(e));}});
   };
   const maxUnits=Math.max(1,...bills.map(bill=>bill.units));
   const answered=hab?hab.questions.filter(q=>{const v=hab.answers[q.id];return Array.isArray(v)?v.length>0:v!=null&&v!=='';}):[];
 
-  return <Page back title={isWater?'Water':'Electricity'}
-    subtitle={isWater?'Your next water bill, why we expect it, and your history.':'Your next electricity bill, why we expect it, and your history.'}>
+  return <Page back title={isWater?t('Water'):t('Electricity')}
+    subtitle={isWater?t('Your next water bill, why we expect it, and your history.'):t('Your next electricity bill, why we expect it, and your history.')}>
     {guard.prompt}
     <View style={[S.heroCard,{backgroundColor:isWater?'#176E78':'#245C91'}]}>
       <View style={S.between}>
-        <Text style={S.heroEyebrow}>NEXT BILLING CYCLE</Text>
-        <Text style={{fontSize:10,fontWeight:'800',color:'#E8F4F4'}}>ESTIMATE</Text>
+        <Text style={S.heroEyebrow}>{t('NEXT BILLING CYCLE')}</Text>
+        <Text style={{fontSize:10,fontWeight:'800',color:'#E8F4F4'}}>{t('ESTIMATE')}</Text>
       </View>
       {loading?<ActivityIndicator color={C.white}/>:<>
-        <Text style={{fontSize:30,fontWeight:'800',color:C.white}}>{data?.value==null?'No forecast yet':money(data.value)}</Text>
+        <Text style={{fontSize:30,fontWeight:'800',color:C.white}}>{data?.value==null?t('No forecast yet'):money(data.value)}</Text>
         <Text style={S.heroFootnote}>{data?.value!=null?`${data.units} ${unit} · ${data.period_start} to ${data.period_end}`:
           (data?.status_message||`Add a ${kind} bill to start your baseline.`)}</Text>
         {data?.cost_range?<Text style={S.heroFootnote}>Likely between {money(data.cost_range.low)} and {money(data.cost_range.high)}</Text>:null}
@@ -56,8 +57,8 @@ export function UtilityDetail({kind}:{kind:UtilityKind}){
     </View>
 
     <Card>
-      <View style={S.between}><Label>Why this estimate</Label>
-        <View style={S.tag}><Text style={S.tagText}>EXPLAINABLE AI</Text></View></View>
+      <View style={S.between}><Label>{t('Why this estimate')}</Label>
+        <View style={S.tag}><Text style={S.tagText}>{t('EXPLAINABLE AI')}</Text></View></View>
       {demo?<Note>Explanations come from the backend (live mode).</Note>:!why?<ActivityIndicator color={C.green}/>:<>
         <Text style={S.body}>{why.summary}</Text>
         {why.factors.length?<View style={{borderWidth:1,borderColor:C.line,borderRadius:14,overflow:'hidden'}}>
@@ -68,29 +69,29 @@ export function UtilityDetail({kind}:{kind:UtilityKind}){
           </View>)}
         </View>:null}
         {why.breakdown.length?<View style={{gap:4}}>
-          <Text style={S.title}>How the bill is calculated</Text>
+          <Text style={S.title}>{t('How the bill is calculated')}</Text>
           {why.breakdown.map(b=><View key={b.label} style={S.between}>
             <Text style={[S.muted,{flex:1}]}>{b.label}{b.how&&b.how!=='fixed'?` · ${b.how}`:''}</Text>
             <Text style={S.title}>{money(b.rs)}</Text></View>)}
         </View>:null}
         {why.to_improve.length?<View style={{gap:3,backgroundColor:C.softAmber,borderRadius:12,padding:11}}>
-          <Text style={S.title}>To make it more accurate</Text>
+          <Text style={S.title}>{t('To make it more accurate')}</Text>
           {why.to_improve.map((t,i)=><Note key={i}>• {t}</Note>)}
         </View>:null}
-        <Note>{why.summary_source==='gemini'?'Written by AI from the calculated figures (numbers checked).':
+        <Note>{why.summary_source==='gemini'?t('Written by AI from the calculated figures (numbers checked).'):
           'Calculated by LiveBetter from your bills and the official tariff.'}</Note>
       </>}
     </Card>
 
     <Card>
-      <View style={S.between}><Label>Past billing cycles</Label><Text style={S.muted}>{bills.length} bills</Text></View>
+      <View style={S.between}><Label>{t('Past billing cycles')}</Label><Text style={S.muted}>{bills.length} bills</Text></View>
       {bills.length?<View style={{height:120,flexDirection:'row',alignItems:'flex-end',justifyContent:'space-around',gap:10,paddingTop:8}}>
         {bills.slice(-6).map(bill=><View key={bill.id} style={{flex:1,alignItems:'center',justifyContent:'flex-end',gap:7,height:'100%'}}>
           <View style={{width:'70%',maxWidth:34,height:Math.max(14,bill.units/maxUnits*80),borderRadius:7,
             backgroundColor:isWater?(bill===bills[bills.length-1]?C.green:'#8ACFD0'):(bill===bills[bills.length-1]?'#3274B8':'#A8C8E8')}}/>
           <Text style={[S.muted,{fontSize:10}]}>{bill.period_start.slice(5,7)}/{bill.period_start.slice(2,4)}</Text>
         </View>)}
-      </View>:<Note>No bills yet. Add one to start your baseline.</Note>}
+      </View>:<Note>{t('No bills yet. Add one to start your baseline.')}</Note>}
       {[...bills].reverse().map(bill=><View key={bill.id} style={{flexDirection:'row',alignItems:'center',gap:10,paddingVertical:9,borderTopWidth:1,borderTopColor:C.line}}>
         <View style={{flex:1}}>
           <Text style={S.body}>{bill.period_start} – {bill.period_end}</Text>
@@ -105,7 +106,7 @@ export function UtilityDetail({kind}:{kind:UtilityKind}){
     </Card>
 
     <Card>
-      <View style={S.between}><Label>{isWater?'Your water habits':'Your appliances and habits'}</Label>
+      <View style={S.between}><Label>{isWater?t('Your water habits'):t('Your appliances and habits')}</Label>
         {hab?<Text style={S.muted}>{answered.length}/{hab.questions.length} answered</Text>:null}</View>
       {hab&&answered.length?answered.map(q=>{
         const v=hab.answers[q.id];
@@ -114,9 +115,9 @@ export function UtilityDetail({kind}:{kind:UtilityKind}){
           <Text style={S.muted}>{q.question}</Text>
           <Text style={S.title}>{Array.isArray(v)?v.map(label).join(', '):label(String(v))}</Text>
         </View>;
-      }):<Note>{isWater?'Tell us about showers, laundry and outdoor use: it personalises your estimate and unlocks calculated savings.':
+      }):<Note>{isWater?t('Tell us about showers, laundry and outdoor use: it personalises your estimate and unlocks calculated savings.'):
         'Tell us which appliances you use: it personalises your estimate and unlocks calculated savings.'}</Note>}
-      <Btn title={isWater?'Edit water habits':'Edit appliances and habits'} outline
+      <Btn title={isWater?t('Edit water habits'):t('Edit appliances and habits')} outline
         onPress={()=>router.push({pathname:'/habits',params:{kind}})}/>
     </Card>
   </Page>;

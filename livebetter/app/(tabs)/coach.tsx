@@ -2,6 +2,7 @@
 // The water and electricity engines calculate every number with the official tariffs; the AI only words it.
 // Layout: header, conversation (scrolls), suggestions, composer. The composer rises with the keyboard.
 import React,{useEffect,useRef,useState} from 'react';
+import {t} from '../../src/i18n';
 import {ActivityIndicator,Keyboard,KeyboardAvoidingView,Platform,Pressable,ScrollView,Text,TextInput,View} from 'react-native';
 import {router} from 'expo-router';
 import {SafeAreaView} from 'react-native-safe-area-context';
@@ -60,8 +61,8 @@ export default function Coach(){
           <View style={S.row}>
             <View style={{width:34,height:34,borderRadius:12,backgroundColor:C.green,alignItems:'center',justifyContent:'center'}}>
               <Text style={{color:C.white,fontSize:17,fontWeight:'900'}}>✦</Text></View>
-            <View><Text style={[S.h2,{fontSize:20}]}>What if…?</Text>
-              <Text style={S.muted}>See how a change affects your bills and budget</Text></View>
+            <View><Text style={[S.h2,{fontSize:20}]}>{t('What if…?')}</Text>
+              <Text style={S.muted}>{t('See how a change affects your bills and budget')}</Text></View>
           </View>
           <Pressable accessibilityRole="button" accessibilityLabel="Open settings" onPress={()=>router.push('/settings')} style={S.topAction}>
             <Text style={S.topActionText}>⚙</Text></Pressable>
@@ -77,25 +78,25 @@ export default function Coach(){
           {showPlan?myPlan.map(p=><View key={p.id} style={{borderTopWidth:1,borderTopColor:'#CDEBE2',paddingTop:6,gap:2}}>
             <Text style={S.body}>{p.question}</Text>
             <Text style={S.muted}>{p.changes.map(c=>`${c.title} (${c.delta_rs<0?'−':'+'}${money(Math.abs(c.delta_rs))})`).join(' · ')}</Text>
-          </View>):<Text style={S.muted}>Changes you applied. Tap to see them.</Text>}
+          </View>):<Text style={S.muted}>{t('Changes you applied. Tap to see them.')}</Text>}
         </Pressable>:null}
         {!msgs.length?<View style={{gap:12,paddingTop:6}}>
           <View style={{backgroundColor:C.navy,borderRadius:20,padding:18,gap:8}}>
-            <Text style={S.heroEyebrow}>AI COACH · WHAT-IF</Text>
-            <Text style={{color:C.white,fontSize:18,fontWeight:'800',lineHeight:24}}>Ask about one change in your home. I recalculate your next water and electricity bills.</Text>
-            <Text style={S.heroFootnote}>Official CWA and CEB tariffs, your own bills, compared with your budget. Say "apply it" to add a change to your plan straight away.</Text>
+            <Text style={S.heroEyebrow}>{t('AI COACH · WHAT-IF')}</Text>
+            <Text style={{color:C.white,fontSize:18,fontWeight:'800',lineHeight:24}}>{t('Ask about one change in your home. I recalculate your next water and electricity bills.')}</Text>
+            <Text style={S.heroFootnote}>{t('Official CWA and CEB tariffs, your own bills, compared with your budget. Say "apply it" to add a change to your plan straight away.')}</Text>
           </View>
         </View>:msgs.map((m,i)=>m.role==='user'?
           <View key={i} style={{alignSelf:'flex-end',maxWidth:'85%',backgroundColor:C.green,borderRadius:18,borderBottomRightRadius:5,
             paddingHorizontal:14,paddingVertical:10}}><Text style={{color:C.white,fontSize:14,lineHeight:20}}>{m.text}</Text></View>:
           <CoachAnswer key={i} msg={m} onApply={()=>void apply(i)} busy={sending}/>)}
         {sending?<View style={[S.row,{alignSelf:'flex-start',backgroundColor:C.white,borderRadius:16,padding:12}]}>
-          <ActivityIndicator color={C.green}/><Text style={S.muted}>Recalculating your bills…</Text></View>:null}
+          <ActivityIndicator color={C.green}/><Text style={S.muted}>{t('Recalculating your bills…')}</Text></View>:null}
       </ScrollView>
 
       <View style={{backgroundColor:C.white,borderTopWidth:1,borderTopColor:C.line}}>
         <View style={[WIDTH,{flexDirection:'row',alignItems:'flex-end',gap:8,paddingHorizontal:14,paddingVertical:10}]}>
-          <TextInput value={draft} onChangeText={setDraft} placeholder="What if I…" placeholderTextColor={C.muted}
+          <TextInput value={draft} onChangeText={setDraft} placeholder={t('What if I…')} placeholderTextColor={C.muted}
             multiline style={[S.chatInput,{maxHeight:110}]} onSubmitEditing={()=>void send()} blurOnSubmit returnKeyType="send"
             accessibilityLabel="Ask a what-if question"/>
           <Pressable accessibilityRole="button" accessibilityLabel="Send" disabled={sending||!draft.trim()} onPress={()=>void send()}
@@ -118,13 +119,13 @@ function CoachAnswer({msg,onApply,busy}:{msg:Msg;onApply:()=>void;busy:boolean})
     borderWidth:1,borderColor:C.line}}>
     {r.changes.map((c,i)=><ChangeCard key={i} c={c}/>)}
     {ok.length>1?<View style={[S.between,{backgroundColor:C.bg,borderRadius:12,padding:11}]}>
-      <Text style={S.title}>Together</Text><Delta v={r.budget?.total_delta_rs||0}/></View>:null}
+      <Text style={S.title}>{t('Together')}</Text><Delta v={r.budget?.total_delta_rs||0}/></View>:null}
     {(r.budget?.lines||[]).map(b=>{
       const pct=Math.min(1.2,b.after_rs/Math.max(1,b.budget_rs));
       return <View key={b.module} style={{gap:5}}>
-        <View style={S.between}><Text style={S.title}>{b.module==='water'?'Water':'Electricity'} budget</Text>
+        <View style={S.between}><Text style={S.title}>{t(b.module==='water'?'Water budget':'Electricity budget')}</Text>
           <Text style={[S.muted,{fontWeight:'700',color:b.within_after?C.green:C.red}]}>
-            {b.within_after?'Within budget':`${money(b.after_rs-b.budget_rs)} over`}</Text></View>
+            {b.within_after?t('Within budget'):`${money(b.after_rs-b.budget_rs)} ${t('over')}`}</Text></View>
         <View style={{height:8,borderRadius:8,backgroundColor:C.line,overflow:'hidden'}}>
           <View style={{width:`${Math.min(100,pct*100)}%`,height:'100%',backgroundColor:b.within_after?C.green:C.red}}/></View>
         <Text style={S.muted}>{money(b.after_rs)} of {money(b.budget_rs)}{b.within_before!==b.within_after?
@@ -132,14 +133,14 @@ function CoachAnswer({msg,onApply,busy}:{msg:Msg;onApply:()=>void;busy:boolean})
       </View>;
     })}
     {r.suggestion?<View style={{backgroundColor:C.softAmber,borderRadius:12,padding:11,gap:3}}>
-      <Text style={[S.title,{fontSize:13}]}>✦ Suggestion</Text><Text style={S.body}>{r.suggestion.replace(/^My suggestion: /,'')}</Text></View>:null}
+      <Text style={[S.title,{fontSize:13}]}>{t('✦ Suggestion')}</Text><Text style={S.body}>{((x:string)=>x.charAt(0).toUpperCase()+x.slice(1))(r.suggestion.replace(/^My suggestion: /,''))}</Text></View>:null}
     {r.applied?<View style={{backgroundColor:C.softGreen,borderRadius:12,padding:11}}>
       <Text style={[S.body,{color:C.green,fontWeight:'700'}]}>✓ {r.applied_message}</Text></View>:
       r.can_apply?<Pressable accessibilityRole="button" disabled={busy} onPress={onApply}
         style={{backgroundColor:C.green,borderRadius:12,paddingVertical:11,alignItems:'center',opacity:busy?0.5:1}}>
-        <Text style={{color:C.white,fontWeight:'800'}}>Apply to my plan</Text></Pressable>:null}
-    {!r.budget?.lines?.length&&ok.length?<Text style={S.muted}>Set a water or electricity budget in your household details to see the effect on it.</Text>:null}
-    <Text style={[S.muted,{fontSize:11}]}>{r.source==='gemini'?'Worded by AI · numbers ':'Numbers '}calculated with the official CWA and CEB tariffs from your bills. Estimates, not measured savings.</Text>
+        <Text style={{color:C.white,fontWeight:'800'}}>{t('Apply to my plan')}</Text></Pressable>:null}
+    {!r.budget?.lines?.length&&ok.length?<Text style={S.muted}>{t('Set a water or electricity budget in your household details to see the effect on it.')}</Text>:null}
+    <Text style={[S.muted,{fontSize:11}]}>{r.source==='gemini'?t('Worded by AI · numbers '):t('Numbers ')}calculated with the official CWA and CEB tariffs from your bills. Estimates, not measured savings.</Text>
   </View>;
 }
 
@@ -155,11 +156,11 @@ function ChangeCard({c}:{c:WhatIfChange}){
       <Delta v={c.delta_rs||0}/>
     </View>
     <View style={{flexDirection:'row',alignItems:'center',gap:8,backgroundColor:C.bg,borderRadius:12,padding:10}}>
-      <View style={{flex:1}}><Text style={S.muted}>Next bill now</Text><Text style={S.title}>{money(c.before_rs)}</Text></View>
+      <View style={{flex:1}}><Text style={S.muted}>{t('Next bill now')}</Text><Text style={S.title}>{money(c.before_rs)}</Text></View>
       <Text style={{color:C.muted,fontSize:18}}>→</Text>
-      <View style={{flex:1}}><Text style={S.muted}>With the change</Text><Text style={S.title}>{money(c.after_rs)}</Text></View>
+      <View style={{flex:1}}><Text style={S.muted}>{t('With the change')}</Text><Text style={S.title}>{money(c.after_rs)}</Text></View>
     </View>
-    <Text style={S.muted}>{Math.abs(c.unit_change||0).toLocaleString()} {c.unit} {(c.unit_change||0)<0?'less':'more'} · {c.period_start} to {c.period_end}{c.how?` · ${c.how}`:''}</Text>
+    <Text style={S.muted}>{Math.abs(c.unit_change||0).toLocaleString()} {c.unit} {(c.unit_change||0)<0?t('less'):t('more')} · {c.period_start} → {c.period_end}{c.how?` · ${c.how}`:''}</Text>
     {c.note?<Text style={[S.muted,{color:'#8A5A00'}]}>{c.note}</Text>:null}
   </View>;
 }
@@ -167,5 +168,5 @@ function ChangeCard({c}:{c:WhatIfChange}){
 function Delta({v}:{v:number}){
   const save=v<0;
   return <View style={{backgroundColor:v===0?C.bg:save?C.softGreen:'#FDECEC',borderRadius:10,paddingHorizontal:9,paddingVertical:5}}>
-    <Text style={{fontWeight:'800',color:v===0?C.muted:save?C.green:C.red}}>{v===0?'Rs 0':`${save?'−':'+'}${money(Math.abs(v))}`}</Text></View>;
+    <Text style={{fontWeight:'800',color:v===0?C.muted:save?C.green:C.red}}>{v===0?t('Rs 0'):`${save?'−':'+'}${money(Math.abs(v))}`}</Text></View>;
 }

@@ -3,6 +3,7 @@
 // The pattern is checked by the backend (core/security.py), never in the app: the app only receives a
 // one-time permission for ONE action, valid 5 minutes, sent with that request as X-Step-Up.
 import React,{useRef,useState} from 'react';
+import {t} from './i18n';
 import {GestureResponderEvent,LayoutChangeEvent,Modal,Pressable,Text,View} from 'react-native';
 import {ApiError} from './api';
 import {useApp} from './context';
@@ -62,7 +63,7 @@ export function PatternPrompt({action,visible,onClose,onAllowed}:{action:Sensiti
   function close(){setDots([]);setMessage(null);onClose();}
   async function check(){
     if(!action)return;
-    if(dots.length<4){setMessage({text:'Connect at least 4 dots.',bad:true});return;}
+    if(dots.length<4){setMessage({text:t('Connect at least 4 dots.'),bad:true});return;}
     setChecking(true);
     try{
       const token=await verifyPattern(action,dots);
@@ -71,24 +72,24 @@ export function PatternPrompt({action,visible,onClose,onAllowed}:{action:Sensiti
     }catch(e){
       setDots([]);
       if(e instanceof ApiError&&e.code==='pattern_required')
-        setMessage({text:'No security pattern is set yet. Set one in Settings → Security first.',bad:true});
+        setMessage({text:t('No security pattern is set yet. Set one in Settings → Security first.'),bad:true});
       else setMessage({text:e instanceof Error?e.message:String(e),bad:true});
     }finally{setChecking(false);}
   }
   return <Modal visible={visible} transparent animationType="fade" onRequestClose={close}>
     <View style={{flex:1,backgroundColor:'rgba(10,30,40,0.55)',justifyContent:'center',padding:18}}>
       <View style={[S.card,{gap:12}]}>
-        <Text style={{fontSize:11,fontWeight:'800',letterSpacing:1,color:C.green}}>PROTECTED ACTION</Text>
+        <Text style={{fontSize:11,fontWeight:'800',letterSpacing:1,color:C.green}}>{t('PROTECTED ACTION')}</Text>
         <Text style={S.title}>Draw your security pattern to {action?labels[action]:'continue'}.</Text>
         <Note>This stops someone else using this phone (for example a child) from changing or wiping your household records.</Note>
         <PatternGrid value={dots} onChange={v=>{setDots(v);setMessage(null);}} disabled={checking}/>
         {message?<Text accessibilityLiveRegion="polite" style={{color:message.bad?C.red:C.green,fontWeight:'700'}}>{message.text}</Text>:null}
         <View style={S.row}>
-          <View style={{flex:1}}><Btn title="Clear" outline onPress={()=>{setDots([]);setMessage(null);}}/></View>
-          <View style={{flex:1}}><Btn title={checking?'Checking…':'Confirm'} disabled={checking} onPress={()=>void check()}/></View>
+          <View style={{flex:1}}><Btn title={t('Clear')} outline onPress={()=>{setDots([]);setMessage(null);}}/></View>
+          <View style={{flex:1}}><Btn title={checking?t('Checking…'):t('Confirm')} disabled={checking} onPress={()=>void check()}/></View>
         </View>
         <Pressable accessibilityRole="button" onPress={close} style={{alignSelf:'center',padding:6}}>
-          <Text style={[S.muted,{fontWeight:'700'}]}>Cancel</Text>
+          <Text style={[S.muted,{fontWeight:'700'}]}>{t('Cancel')}</Text>
         </Pressable>
       </View>
     </View>
@@ -101,6 +102,6 @@ export function usePattern(){
   const pending=useRef<((t:string)=>void|Promise<void>)|null>(null);
   const ask=(a:SensitiveAction,fn:(stepUp:string)=>void|Promise<void>)=>{pending.current=fn;setAction(a);};
   const prompt=<PatternPrompt action={action} visible={!!action} onClose={()=>setAction(null)}
-    onAllowed={async t=>{const fn=pending.current;setAction(null);if(fn)await fn(t);}}/>;
+    onAllowed={async tok=>{const fn=pending.current;setAction(null);if(fn)await fn(tok);}}/>;
   return {ask,prompt};
 }

@@ -211,6 +211,18 @@ one were removed (language switch, manual pantry edit, expiry dates, "try one ch
 - **Activity:** AI recommendations, Water, Electricity, Groceries and pantry, Security; each opens a timeline with
   date filter and PDF export (Kentish's export).
 
+## 14 Nov (night) additions
+- **Languages:** English, Français, Kreol Morisien. Chosen on the Welcome / Register screen and in Settings; all screens,
+  forms and the activity PDF report use it (`livebetter/src/i18n.ts`, `src/translations.ts`). Calculated numbers never
+  change. With `GEMINI_API_KEY`, the AI texts (forecast explanation, coach suggestion) are also written in that
+  language, with the same number check. Kreol uses the standard spelling: please have a native speaker review it.
+- **AI Coach (What if…?):** no preset questions. Shower changes count water AND water-heater electricity (if the water
+  heater is electric); guests count water and electricity. Every answer has a rule-based suggestion; **Apply to my
+  plan** (or typing "apply it") records the change (`household_actions`, Activity → AI recommendations) and saves it as
+  a goal in the water / electricity module when possible. `POST /household/coach/apply`, `GET /household/plans`.
+- **Recipes:** scanning an ingredient shows database recipes AND an AI-generated recipe; **Use this recipe · I cooked
+  it** saves it and lowers the pantry stock; **My recipes** lists saved recipes and all database recipes.
+
 ## Surprise card: Misuse
 
 **Misuse we identified:** someone who picks up the owner's unlocked, signed-in phone (a child playing, a housemate,
