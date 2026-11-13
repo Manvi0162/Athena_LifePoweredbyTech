@@ -83,6 +83,9 @@ def template(a):
     if s:
         text = (f"{a['title']}: about Rs {s:,.0f} less over {_period(a)} "
                 f"(the {module} module recalculated the official tariff).")
+    if s == 0:
+        return (f"{a['title']}: it saves {module} but not money for you right now: at your current use the bill "
+                "stays at the minimum charge. Still worth it if your use goes up.")
     if ev.get("calculation"):
         text += f" Calculation: {ev['calculation']}."
     return text + " This is a plan, not a measured saving: your next bill will show the real change."

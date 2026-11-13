@@ -75,7 +75,8 @@ def extract_savings_actions(module_results):
                             "detail": rec.get("detail"), "status": rec.get("status"),
                             "estimated_savings_mur": amount, "savings_period": period,
                             "evidence": rec.get("evidence", {}),
-                            "has_valid_savings": amount is not None and isinstance(period, str) and bool(period.strip())})
+                            # integration: a Rs 0 saving (e.g. CEB minimum charge) is not ranked as a saving
+                            "has_valid_savings": bool(amount) and isinstance(period, str) and bool(period.strip())})
     return actions
 
 
@@ -241,7 +242,9 @@ def big_brain_v3(ctx, household, use_ai=True):
                                           "recommendation_count": r["recommendation_count"]}
                                       for m, r in module_results.items()},
                  "household_actions": household_actions,
-                 "module_actions": rank_normalized_actions(normalized)}
+                 # integration: a Rs 0 saving (e.g. usage already in the lowest tariff block) is not a priority
+                 "module_actions": rank_normalized_actions(
+                     [a for a in normalized if (a.get("normalized_savings_30d_mur") or 0) > 0])}
     response = build_big_brain_v3_response(result_v2, generate_big_brain_reasoning(result_v2, use_ai))
     response["dashboard"]["data_notice"] = (
         "Household records, water and electricity forecasts and savings all come from this household's own "

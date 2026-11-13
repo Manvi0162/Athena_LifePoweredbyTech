@@ -126,6 +126,9 @@ def score(rec, main_goal=None):
         urgency = 3
     elif kind == "unlock":
         impact, urgency = 1, 1
+    elif s is not None and s <= 0:
+        # e.g. CEB minimum charge: using less does not change this household's bill, so it is not a money priority
+        impact, urgency = 0, 1
     else:
         impact = 3 if (s or 0) >= 200 else 2 if (s or 0) >= 50 else 1
         urgency = 2

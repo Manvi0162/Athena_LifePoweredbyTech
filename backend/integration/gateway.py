@@ -101,7 +101,7 @@ class UIBill(BaseModel):
     kind: str
     period_start: date
     period_end: date
-    units: float = Field(ge=0)
+    units: float = Field(gt=0)            # a 0 m3 / 0 kWh bill is a typing mistake, not a bill
     amount: float | None = Field(default=None, ge=0)
     tariff: str | None = None
     start_reading: float | None = None
@@ -119,6 +119,8 @@ def _validation(exc: ValidationError):
 @router.post("/bills")
 def add_bill(b: UIBill):
     require_household()
+    if b.amount == 0:                     # CWA and CEB always charge something: Rs 0 means "not entered"
+        b.amount = None
     if b.kind == "water":
         from water import api as wapi
         from water import store as wstore
