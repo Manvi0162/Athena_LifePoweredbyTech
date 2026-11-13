@@ -40,7 +40,7 @@ export default function Onboarding(){
     }catch(error){Alert.alert('Could not save household',String(error));}
   }
 
-  return <Page back title={titles[step]}
+  return <Page showTabs={false} back title={titles[step]}
     subtitle="A few quick answers help make your household picture more useful.">
     <View style={{gap:8}}>
       <View style={S.between}><Text style={S.muted}>STEP {step+1} OF {steps.length}</Text><Text style={S.muted}>{steps[step]}</Text></View>
@@ -53,7 +53,7 @@ export default function Onboarding(){
       <Field label="How many people live here?" value={members} onChangeText={setMembers} keyboardType="number-pad"/>
       <ChoiceChips label="What type of home do you live in?" options={['House','Apartment','Shared home','Other']}
         value={type} onChange={setType}/>
-      <Note>Only share details you are comfortable storing in this demo.</Note>
+      <Note>Only share details you are comfortable storing with the app.</Note>
     </Card>:null}
 
     {step===1?<Card>

@@ -126,5 +126,5 @@ export function mockScenario(s:Snapshot,category:UtilityKind,percent:number):Sce
   return {baseline:f.value,adjusted:null,delta:null,
     unit_change:f.value==null?null:Number((f.units*percent/100).toFixed(2)),
     message:'Illustrative consumption change only. Verified tariff-based cost savings require the backend utility engine.',
-    assumptions:[`${percent}% hypothetical reduction in ${category} usage`,'No tariff-based money saving calculated in offline demo mode']};
+    assumptions:[`${percent}% hypothetical reduction in ${category} usage`,'No tariff-based money saving calculated.']};
 }

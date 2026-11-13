@@ -65,7 +65,7 @@ export function AppProvider({children}:{children:React.ReactNode}){
     await commit(putReceipt(state,items));
   });
   const parseReceipt=async(uri:string):Promise<ParsedReceipt>=>{
-    if(DEMO_MODE)throw Error('Demo mode has no OCR. Enter items manually or load the labeled sample receipt.');
+    if(DEMO_MODE)throw Error('Automatic receipt extraction is not configured. Enter items manually.');
     return uploadImage<ParsedReceipt>(routes.parse,uri,householdId);
   };
   const forecast=async(kind:UtilityKind)=>{

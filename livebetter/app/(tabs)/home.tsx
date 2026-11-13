@@ -7,11 +7,9 @@ import {money,S,C} from '../../src/theme';
 import {ActionRow,Btn,Card,Label,Note,Page} from '../../src/ui';
 
 export default function Home(){
-  const {state,insights,demo,clearDemo}=useApp();
+  const {state,insights}=useApp();
   const [summary,setSummary]=useState<Insight|null>(null);
   const [loading,setLoading]=useState(true);
-  const [confirmReset,setConfirmReset]=useState(false);
-  const [resetError,setResetError]=useState<string|null>(null);
 
   useEffect(()=>{
     let active=true;
@@ -21,7 +19,7 @@ export default function Home(){
     return()=>{active=false;};
   },[insights,state]);
 
-  return <Page title="Your household" subtitle={`${state.household?.name||'Welcome home'} · Monthly overview`} showSettings>
+  return <Page back={false} title="Your household" subtitle={`${state.household?.name||'Welcome home'} · Monthly overview`} showSettings>
     <View style={S.heroCard}>
       <Text style={S.heroEyebrow}>NEXT BILLING CYCLE · UTILITIES</Text>
       {loading?<ActivityIndicator color={C.white}/>:<>
@@ -48,7 +46,7 @@ export default function Home(){
           <Text style={S.statLabel}>WATER</Text>
           <Text style={S.statValue}>{summary?.water==null?'No forecast':money(summary.water)}</Text>
         </Pressable>
-        <Pressable accessibilityRole="button" onPress={()=>router.push('/electricity')} style={[S.statCard,{backgroundColor:C.softAmber}]}>
+        <Pressable accessibilityRole="button" onPress={()=>router.push('/electricity')} style={[S.statCard,{backgroundColor:C.softElectric}]}>
           <Text style={S.statLabel}>ELECTRICITY</Text>
           <Text style={S.statValue}>{summary?.electricity==null?'No forecast':money(summary.electricity)}</Text>
         </Pressable>
@@ -91,18 +89,5 @@ export default function Home(){
       </View>)}
     </Card>:null}
 
-    {demo?<Card>
-      <Label>Demo controls</Label>
-      <Note>Reset removes local demo bills, confirmed receipts and inventory edits.</Note>
-      {confirmReset?<View style={{gap:8,backgroundColor:C.dangerBg,borderRadius:14,padding:12}}>
-        <Text style={{color:C.red,fontWeight:'700'}}>Remove all local demo records?</Text>
-        {resetError?<Text style={{color:C.red}}>{resetError}</Text>:null}
-        <Btn title="Confirm reset" danger onPress={async()=>{
-          try{await clearDemo();router.replace('/welcome');}
-          catch(error){setResetError(String(error));}
-        }}/>
-        <Btn title="Cancel" outline onPress={()=>{setConfirmReset(false);setResetError(null);}}/>
-      </View>:<Btn title="Reset local demo data" danger onPress={()=>setConfirmReset(true)}/>}
-    </Card>:null}
   </Page>;
 }

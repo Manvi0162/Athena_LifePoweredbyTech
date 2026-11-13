@@ -1,13 +1,14 @@
 import { StyleSheet } from 'react-native';
 export const C = { bg:'#F2F7F8', ink:'#0B2433', muted:'#718493', green:'#079C89', mint:'#DDF5EE',
   white:'#FFFFFF', line:'#DCE8EB', blue:'#E7F4F7', amber:'#FFF1D8', red:'#9B3333', dangerBg:'#FFF0F0',
-  navy:'#14283D', softGreen:'#E5F6F0', softBlue:'#EAF4F8', softAmber:'#FFF5E6' };
+  navy:'#14283D', softGreen:'#E5F6F0', softBlue:'#EAF4F8', softElectric:'#E9EEFF', softAmber:'#FFF5E6' };
 export const S = StyleSheet.create({
   screen:{flex:1,backgroundColor:C.bg},
   content:{width:'100%',maxWidth:440,alignSelf:'center',paddingHorizontal:18,paddingTop:10,paddingBottom:32,gap:15},
   brandRow:{flexDirection:'row',alignItems:'center',gap:9,marginBottom:2},
   brandMark:{width:30,height:30,borderRadius:10,backgroundColor:C.green,alignItems:'center',justifyContent:'center'},
-  brandInitial:{fontSize:13,fontWeight:'900',color:C.white},
+  brandInitial:{fontSize:17,fontWeight:'900',lineHeight:20,color:C.white,marginRight:2,marginTop:3},
+  brandPlus:{position:'absolute',top:1,right:5,fontSize:10,lineHeight:12,fontWeight:'900',color:C.white},
   brandName:{fontSize:12,fontWeight:'900',letterSpacing:1.2,color:C.ink},
   brandCaption:{fontSize:9,fontWeight:'700',letterSpacing:0.8,color:C.muted,marginTop:1},
   card:{backgroundColor:C.white,borderRadius:20,padding:17,borderWidth:1,borderColor:C.line,gap:11},
@@ -53,5 +54,8 @@ export const S = StyleSheet.create({
   chatInput:{flex:1,minHeight:44,maxHeight:96,borderWidth:1,borderColor:C.line,borderRadius:14,paddingHorizontal:13,paddingVertical:10,color:C.ink,backgroundColor:C.bg,fontSize:14},
   tabIcon:{width:34,height:25,borderRadius:10,alignItems:'center',justifyContent:'center'},
   tabIconText:{fontSize:16,fontWeight:'800'},
+  bottomNavigation:{height:64,width:'100%',maxWidth:480,alignSelf:'center',flexDirection:'row',
+    alignItems:'center',justifyContent:'space-around',backgroundColor:C.white,borderTopWidth:1,borderTopColor:C.line},
+  bottomNavigationItem:{flex:1,minWidth:0,height:'100%',alignItems:'center',justifyContent:'center',gap:2},
 });
 export const money = (n:number|null|undefined) => n==null ? 'Not available' : `Rs ${n.toLocaleString('en-MU',{maximumFractionDigits:2})}`;

@@ -1,14 +1,12 @@
-import React,{useState} from 'react';
+import React from 'react';
 import {Text,View} from 'react-native';
 import {router} from 'expo-router';
 import {useApp} from '../../src/context';
 import {C,S} from '../../src/theme';
-import {ActionRow,Btn,Card,Label,Note,Page} from '../../src/ui';
+import {ActionRow,Card,Label,Note,Page} from '../../src/ui';
 
 export default function Settings(){
-  const {state,demo,clearDemo}=useApp();
-  const [confirmReset,setConfirmReset]=useState(false);
-  const [resetError,setResetError]=useState<string|null>(null);
+  const {state}=useApp();
   return <Page back title="Settings" subtitle="Your household and app preferences.">
     <Card>
       <Label>Household details</Label>
@@ -28,21 +26,6 @@ export default function Settings(){
       <Label>History and activity</Label>
       <ActionRow icon="◷" title="Household activity" subtitle="Bills, receipts and pantry updates"
         onPress={()=>router.push('/activity')}/>
-    </Card>
-    <Card>
-      <Label>Your data</Label>
-      <Note>{demo?'Demo records are stored on this device.':'Household records are sent to the configured API.'} Do not enter sensitive personal details in this preview.</Note>
-      {demo?<View style={{gap:9}}>
-        {confirmReset?<View style={{gap:8,backgroundColor:C.dangerBg,borderRadius:14,padding:12}}>
-          <Text style={{color:C.red,fontWeight:'700'}}>This removes local bills, receipts and pantry changes.</Text>
-          {resetError?<Text style={{color:C.red}}>{resetError}</Text>:null}
-          <Btn title="Confirm reset" danger onPress={async()=>{
-            try{await clearDemo();router.replace('/welcome');}
-            catch(error){setResetError(String(error));}
-          }}/>
-          <Btn title="Cancel" outline onPress={()=>{setConfirmReset(false);setResetError(null);}}/>
-        </View>:<Btn title="Reset local demo data" danger onPress={()=>setConfirmReset(true)}/>}
-      </View>:null}
     </Card>
   </Page>;
 }

@@ -3,14 +3,13 @@ import {Alert,Image,Text,View} from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import {router} from 'expo-router';
 import {useApp} from '../../src/context';
-import {sampleReceipt} from '../../src/mock';
 import {ReceiptItem} from '../../src/types';
 import {money,S} from '../../src/theme';
 import {Btn,Card,Field,Note,Page} from '../../src/ui';
 export default function Receipt(){const {demo,parseReceipt,confirmReceipt}=useApp();
   const [image,setImage]=useState<string|null>(null);const [items,setItems]=useState<ReceiptItem[]>([]);
   const [receiptId,setReceiptId]=useState<string|undefined>();
-  const [message,setMessage]=useState('No data extracted. Add items manually, or load the labeled sample in Demo mode.');
+  const [message,setMessage]=useState('No items extracted. Add your purchased items below.');
   async function choose(camera:boolean){try{
     if(camera){const permission=await ImagePicker.requestCameraPermissionsAsync();if(!permission.granted)
       return Alert.alert('Permission needed','Camera access is required to photograph a receipt.');}
@@ -18,7 +17,7 @@ export default function Receipt(){const {demo,parseReceipt,confirmReceipt}=useAp
       await ImagePicker.launchImageLibraryAsync({mediaTypes:['images'],quality:.6});
     if(result.canceled)return;
     const uri=result.assets[0].uri;setImage(uri);
-    if(demo){setMessage('Photo preview captured. OCR is not available in Demo mode. Review and enter items manually.');return;}
+    if(demo){setMessage('Photo added. Automatic item extraction is unavailable; enter items manually.');return;}
     const parsed=await parseReceipt(uri);
     setItems(parsed.items||[]);setReceiptId(parsed.receipt_id);
     setMessage('OCR suggestions: inspect and correct every item before saving.');
@@ -34,9 +33,6 @@ export default function Receipt(){const {demo,parseReceipt,confirmReceipt}=useAp
       <Btn title="Choose image from gallery" outline onPress={()=>choose(false)}/>
       {image?<Image source={{uri:image}} style={{height:190,borderRadius:10}} resizeMode="contain"/>:null}
       <Note>{message}</Note>
-      {demo?<Btn title="Load fictional sample receipt" outline onPress={()=>{
-        setItems(sampleReceipt.map(x=>({...x})));setReceiptId(undefined);
-        setMessage('FICTIONAL SAMPLE loaded manually — these items are not claimed to be OCR results.');}}/>:null}
     </Card>
     <Card><Text style={S.h2}>Review purchased items</Text>
       {items.map((item,i)=><View key={i} style={{gap:6,borderBottomWidth:1,borderBottomColor:'#DDE8E3',paddingBottom:12}}>
