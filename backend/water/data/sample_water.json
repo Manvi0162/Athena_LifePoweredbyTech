@@ -1,0 +1,19 @@
+{
+ "note": "FICTIONAL SAMPLE HOUSEHOLD for rehearsing the demo (the spec allows this). Bills are illustrative, NOT real CWA invoices. Use POST /water/demo/reset for an empty account.",
+ "seed": "athena-sample",
+ "today": "2026-11-13",
+ "household": {"members": 4, "home_type": "house", "occupancy": "evenings_and_nights", "main_goal": "reduce_expenses"},
+ "profile": {"sewer": false, "region": "Centre", "has_air_conditioning": false, "monthly_budget_rs": 250},
+ "assessments": [],
+ "bills": [
+  {"id": "s1", "start": "2026-07-13", "end": "2026-08-13", "m3": 22.4, "amount_rs": null, "start_reading": 1380.6, "end_reading": 1403.0, "source": "sample (illustrative)"},
+  {"id": "s2", "start": "2026-08-13", "end": "2026-09-13", "m3": 23.1, "amount_rs": null, "start_reading": 1403.0, "end_reading": 1426.1, "source": "sample (illustrative)"},
+  {"id": "s3", "start": "2026-09-13", "end": "2026-10-13", "m3": 24.0, "amount_rs": 232.0, "start_reading": 1426.1, "end_reading": 1450.1, "source": "sample (illustrative)"}
+ ],
+ "readings": [],
+ "actions": [],
+ "forecasts": [],
+ "checks": [],
+ "scenario_runs": [],
+ "activity": []
+}

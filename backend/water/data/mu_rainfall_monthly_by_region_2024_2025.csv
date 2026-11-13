@@ -1,0 +1,85 @@
+region,month,long_term_mean_1991_2020_mm,rain_2024_mm,rain_2025_mm
+Centre,Jan,359.0,705.0,104.0
+Centre,Feb,420.0,315.0,253.0
+Centre,Mar,377.0,421.0,278.0
+Centre,Apr,269.0,267.0,352.0
+Centre,May,204.0,390.0,426.0
+Centre,Jun,172.0,222.0,247.0
+Centre,Jul,211.0,72.0,294.0
+Centre,Aug,165.0,105.0,241.0
+Centre,Sep,126.0,74.0,128.0
+Centre,Oct,106.0,164.0,59.0
+Centre,Nov,116.0,153.0,175.0
+Centre,Dec,216.0,214.0,273.0
+East,Jan,344.0,758.0,84.0
+East,Feb,400.0,242.0,260.0
+East,Mar,382.0,368.0,182.0
+East,Apr,284.0,260.0,344.0
+East,May,207.0,308.0,385.0
+East,Jun,161.0,183.0,201.0
+East,Jul,179.0,53.0,176.0
+East,Aug,150.0,71.0,169.0
+East,Sep,116.0,47.0,81.0
+East,Oct,97.0,121.0,46.0
+East,Nov,109.0,223.0,247.0
+East,Dec,211.0,155.0,141.0
+Island of Mauritius,Jan,282.0,573.0,85.0
+Island of Mauritius,Feb,323.0,201.0,190.0
+Island of Mauritius,Mar,294.0,298.0,168.0
+Island of Mauritius,Apr,206.0,225.0,251.0
+Island of Mauritius,May,148.0,228.0,286.0
+Island of Mauritius,Jun,117.0,152.0,147.0
+Island of Mauritius,Jul,133.0,48.0,149.0
+Island of Mauritius,Aug,108.0,61.0,136.0
+Island of Mauritius,Sep,85.0,39.0,66.0
+Island of Mauritius,Oct,73.0,95.0,35.0
+Island of Mauritius,Nov,85.0,125.0,140.0
+Island of Mauritius,Dec,165.0,135.0,171.0
+North,Jan,191.0,344.0,68.0
+North,Feb,218.0,88.0,120.0
+North,Mar,206.0,267.0,69.0
+North,Apr,127.0,154.0,194.0
+North,May,90.0,64.0,147.0
+North,Jun,67.0,103.0,80.0
+North,Jul,65.0,16.0,61.0
+North,Aug,56.0,41.0,83.0
+North,Sep,45.0,20.0,31.0
+North,Oct,39.0,28.0,21.0
+North,Nov,48.0,133.0,102.0
+North,Dec,102.0,55.0,98.0
+Rodrigues (Pointe Canon),Jan,142.0,191.0,66.0
+Rodrigues (Pointe Canon),Feb,150.0,192.0,122.0
+Rodrigues (Pointe Canon),Mar,162.0,181.0,44.0
+Rodrigues (Pointe Canon),Apr,130.0,91.0,94.0
+Rodrigues (Pointe Canon),May,92.0,170.0,245.0
+Rodrigues (Pointe Canon),Jun,73.0,53.0,168.0
+Rodrigues (Pointe Canon),Jul,87.0,19.0,115.0
+Rodrigues (Pointe Canon),Aug,63.0,64.0,74.0
+Rodrigues (Pointe Canon),Sep,46.0,32.0,39.0
+Rodrigues (Pointe Canon),Oct,51.0,95.0,50.0
+Rodrigues (Pointe Canon),Nov,49.0,95.0,11.0
+Rodrigues (Pointe Canon),Dec,68.0,47.0,40.0
+South,Jan,324.0,650.0,94.0
+South,Feb,374.0,303.0,198.0
+South,Mar,352.0,306.0,183.0
+South,Apr,269.0,313.0,243.0
+South,May,195.0,308.0,343.0
+South,Jun,159.0,202.0,180.0
+South,Jul,188.0,87.0,163.0
+South,Aug,149.0,77.0,156.0
+South,Sep,114.0,49.0,79.0
+South,Oct,101.0,134.0,46.0
+South,Nov,114.0,92.0,138.0
+South,Dec,201.0,161.0,179.0
+West,Jan,195.0,414.0,75.0
+West,Feb,202.0,33.0,117.0
+West,Mar,155.0,104.0,119.0
+West,Apr,80.0,116.0,113.0
+West,May,42.0,11.0,52.0
+West,Jun,27.0,34.0,7.0
+West,Jul,20.0,5.0,4.0
+West,Aug,20.0,4.0,13.0
+West,Sep,24.0,1.0,2.0
+West,Oct,23.0,17.0,
+West,Nov,38.0,23.0,37.0
+West,Dec,96.0,87.0,156.0

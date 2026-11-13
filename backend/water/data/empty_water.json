@@ -1,0 +1,14 @@
+{
+ "seed": "athena",
+ "today": null,
+ "household": {"members": null, "home_type": null, "occupancy": null, "main_goal": null},
+ "profile": {"sewer": null, "region": null, "has_air_conditioning": false, "monthly_budget_rs": null},
+ "assessments": [],
+ "bills": [],
+ "readings": [],
+ "actions": [],
+ "forecasts": [],
+ "checks": [],
+ "scenario_runs": [],
+ "activity": []
+}

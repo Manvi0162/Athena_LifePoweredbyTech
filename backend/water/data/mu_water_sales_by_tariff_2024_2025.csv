@@ -1,0 +1,19 @@
+tariff,year,subscribers,volume_sold_thousand_m3,amount_collectible_rs_thousand,avg_consumption_m3_per_subscriber_year,avg_price_rs_per_m3
+Domestic,2024,382693,87768,878101,229,10.00
+Domestic,2025,387256,87053,867761,225,9.97
+Public Sector Agency,2024,2632,4558,109133,1732,23.94
+Public Sector Agency,2025,2628,4529,108550,1723,23.94
+Acquired / concessionary prices,2024,7,2,7,342,2.99
+Acquired / concessionary prices,2025,7,2,6,334,2.63
+Business,2024,1463,8566,295957,5855,34.55
+Business,2025,1948,9409,326238,4830,34.67
+Commercial,2024,17761,8680,230248,489,26.53
+Commercial,2025,17951,8114,218081,452,26.88
+Religious,2024,2381,716,14448,301,20.19
+Religious,2025,2383,689,13736,289,19.94
+Industrial,2024,503,3413,62253,6786,18.24
+Industrial,2025,488,3231,58974,6620,18.26
+Agriculture,2024,4368,1620,23650,371,14.60
+Agriculture,2025,4358,1663,24227,381,14.57
+Total potable water,2024,411808,115324,1613796,280,13.99
+Total potable water,2025,417019,114689,1617574,275,14.10
