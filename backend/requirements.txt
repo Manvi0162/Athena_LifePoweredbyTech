@@ -1,0 +1,12 @@
+fastapi>=0.110
+uvicorn>=0.29
+pydantic>=2.6
+httpx>=0.27
+python-multipart
+supabase
+python-dotenv
+pytest>=8
+# Security (surprise card: misuse) - free, public libraries
+pyotp>=2.9          # Microsoft / Google Authenticator codes (TOTP, RFC 6238)
+segno>=1.6          # QR code for the authenticator setup (pure Python)
+cryptography>=42    # Fernet: the authenticator secret is stored encrypted

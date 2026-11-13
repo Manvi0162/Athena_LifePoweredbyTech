@@ -2,15 +2,17 @@ import React,{useState} from 'react';
 import {Alert,Text,View} from 'react-native';
 import {router} from 'expo-router';
 import {useApp} from '../src/context';
-import {Btn,Card,ChoiceChips,Field,Label,Note,Page} from '../src/ui';
+import {usePattern} from '../src/pattern';
+import {Btn,Card,ChoiceChips,Field,Label,Note,Page,readError} from '../src/ui';
 import {C,S} from '../src/theme';
 
 const steps=['Household','Daily life','Priorities','Review'];
 const titles=['First, your household','Tell us about daily life','Set your household priorities','Review your answers'];
 
 export default function Onboarding(){
-  const {onboard,state}=useApp();
+  const {onboard,state,demo}=useApp();
   const h=state.household;
+  const guard=usePattern();          // changing an existing household needs the security pattern
   const [step,setStep]=useState(0);
   const [name,setName]=useState(h?.name||'My household');
   const [members,setMembers]=useState(String(h?.members||4));
@@ -33,15 +35,19 @@ export default function Onboarding(){
     const target=Number(budget);
     if(!Number.isFinite(target)||target<0||!water.trim()||!electricity.trim())
       return Alert.alert('Check your priorities','Enter a valid monthly target and both tariff categories.');
-    try{
-      await onboard({name:name.trim(),members:Number(members),home_type:type,water_tariff:water,
-        electricity_tariff:electricity,monthly_target:target,diet,allergies,water_habit:waterHabit,appliance_notes:appliances});
-      router.replace('/(tabs)/home');
-    }catch(error){Alert.alert('Could not save household',String(error));}
+    const send=async(stepUp?:string)=>{
+      try{
+        await onboard({name:name.trim(),members:Number(members),home_type:type,water_tariff:water,
+          electricity_tariff:electricity,monthly_target:target,diet,allergies,water_habit:waterHabit,appliance_notes:appliances},stepUp);
+        router.replace('/(tabs)/home');
+      }catch(error){Alert.alert('Could not save household',readError(error));}
+    };
+    if(h&&!demo)guard.ask('edit_household',send); else await send();
   }
 
   return <Page showTabs={false} back title={titles[step]}
     subtitle="A few quick answers help make your household picture more useful.">
+    {guard.prompt}
     <View style={{gap:8}}>
       <View style={S.between}><Text style={S.muted}>STEP {step+1} OF {steps.length}</Text><Text style={S.muted}>{steps[step]}</Text></View>
       <View style={S.progressTrack}><View style={[S.progressFill,{width:`${((step+1)/steps.length)*100}%`}]}/></View>

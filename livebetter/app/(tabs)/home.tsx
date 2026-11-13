@@ -1,25 +1,54 @@
 import React,{useEffect,useState} from 'react';
-import {ActivityIndicator,Alert,Pressable,Text,View} from 'react-native';
+import {ActivityIndicator,Pressable,Text,View} from 'react-native';
 import {router} from 'expo-router';
 import {useApp} from '../../src/context';
-import {Insight} from '../../src/types';
+import {Insight,SecurityStatus} from '../../src/types';
 import {money,S,C} from '../../src/theme';
-import {ActionRow,Btn,Card,Label,Note,Page} from '../../src/ui';
+import {Btn,Note,Page} from '../../src/ui';
+
+type Attention={key:string;icon:string;title:string;detail:string;go:()=>void};
+const PASTEL_RED='#FDECEC', RED_LINE='#F5C9C9';
 
 export default function Home(){
-  const {state,insights}=useApp();
+  const {state,insights,demo,securityStatus}=useApp();
   const [summary,setSummary]=useState<Insight|null>(null);
+  const [sec,setSec]=useState<SecurityStatus|null>(null);
   const [loading,setLoading]=useState(true);
 
   useEffect(()=>{
     let active=true;
-    insights().then(value=>{if(active)setSummary(value);})
-      .catch(error=>{if(active)Alert.alert('Summary unavailable',String(error));})
+    insights().then(value=>{if(active)setSummary(value);}).catch(()=>undefined)
       .finally(()=>{if(active)setLoading(false);});
+    if(!demo)securityStatus().then(v=>{if(active)setSec(v);}).catch(()=>undefined);
     return()=>{active=false;};
-  },[insights,state]);
+  },[insights,securityStatus,demo,state]);
+
+  // What needs attention: security first, then the AI recommendations that matter now (alerts, real savings).
+  const items:Attention[]=[];
+  if(sec?.alert)items.push({key:'sec',icon:'⚠',title:'Security alert',detail:sec.alert.message,go:()=>router.push('/security')});
+  if(sec&&!sec.pattern_set)items.push({key:'pattern',icon:'⬡',title:'Set your security pattern',
+    detail:'Without it, anyone using this phone could reset your account or delete bills.',go:()=>router.push('/security')});
+  if(!state.bills.some(b=>b.kind==='water'))items.push({key:'wb',icon:'◉',title:'Add a water bill',
+    detail:'Needed for your water estimate.',go:()=>router.push({pathname:'/bill',params:{kind:'water'}})});
+  if(!state.bills.some(b=>b.kind==='electricity'))items.push({key:'eb',icon:'ϟ',title:'Add an electricity bill',
+    detail:'Needed for your electricity estimate.',go:()=>router.push({pathname:'/bill',params:{kind:'electricity'}})});
+  const ai=(summary?.actions||[]).filter(a=>a.source==='domain_module'&&a.status!=='completed'&&
+    (a.kind==='alert'||(a.estimated_savings_mur||0)>0));
+  for(const a of ai.slice(0,3)){
+    const target=a.module==='food'?'/pantry':a.module==='water'?'/water':'/electricity';
+    items.push({key:`${a.module}:${a.action_id}`,icon:a.kind==='alert'?'!':'✦',
+      title:a.kind==='alert'?a.title:`${a.title}${a.estimated_savings_mur?` · save about ${money(a.estimated_savings_mur)}`:''}`,
+      detail:`AI recommendation · ${a.module} · ${a.explanation||''}`.trim(),go:()=>router.push(target as any)});
+  }
+  if(!state.pantry.some(p=>p.available&&p.quantity>0))items.push({key:'pantry',icon:'▤',title:'Your pantry is empty',
+    detail:'Scan a grocery receipt to track what you have.',go:()=>router.push('/receipt')});
 
   return <Page back={false} title="Your household" subtitle={`${state.household?.name||'Welcome home'} · Monthly overview`} showSettings>
+    <View style={S.statRow}>
+      <View style={{flex:1}}><Btn title="＋ Add a bill" onPress={()=>router.push('/bill')}/></View>
+      <View style={{flex:1}}><Btn title="Scan a receipt" outline onPress={()=>router.push('/receipt')}/></View>
+    </View>
+
     <View style={S.heroCard}>
       <Text style={S.heroEyebrow}>NEXT BILLING CYCLE · UTILITIES</Text>
       {loading?<ActivityIndicator color={C.white}/>:<>
@@ -34,60 +63,34 @@ export default function Home(){
             <Text style={S.heroMetricValue}>{summary?.electricity==null?'No forecast yet':money(summary.electricity)}</Text>
           </View>
         </View>
-        <Text style={S.heroFootnote}>Historical estimates, not verified tariff outputs.</Text>
+        <Text style={S.heroFootnote}>Estimates from your confirmed bills, calculated with the official CWA and CEB tariffs.</Text>
         <Btn title="View utility details  →" outline onPress={()=>router.navigate('/(tabs)/utilities')}/>
       </>}
     </View>
 
     <View style={{gap:10}}>
-      <View style={S.between}><Label>By category</Label><Text style={S.muted}>Next cycle / recorded</Text></View>
-      <View style={S.statRow}>
-        <Pressable accessibilityRole="button" onPress={()=>router.push('/water')} style={[S.statCard,{backgroundColor:C.softBlue}]}>
-          <Text style={S.statLabel}>WATER</Text>
-          <Text style={S.statValue}>{summary?.water==null?'No forecast':money(summary.water)}</Text>
-        </Pressable>
-        <Pressable accessibilityRole="button" onPress={()=>router.push('/electricity')} style={[S.statCard,{backgroundColor:C.softElectric}]}>
-          <Text style={S.statLabel}>ELECTRICITY</Text>
-          <Text style={S.statValue}>{summary?.electricity==null?'No forecast':money(summary.electricity)}</Text>
-        </Pressable>
-        <Pressable accessibilityRole="button" onPress={()=>router.navigate('/(tabs)/pantry')} style={[S.statCard,{backgroundColor:C.softGreen}]}>
-          <Text style={S.statLabel}>GROCERIES</Text><Text style={S.statValue}>{money(summary?.groceries_recorded)}</Text>
-        </Pressable>
+      <Text style={S.h2}>By category</Text>
+      <Pressable accessibilityRole="button" accessibilityLabel="Groceries" onPress={()=>router.navigate('/(tabs)/pantry')}
+        style={{backgroundColor:C.softGreen,borderRadius:16,paddingVertical:16,paddingHorizontal:18,gap:4}}>
+        <View style={S.between}><Text style={S.statLabel}>GROCERIES · THIS MONTH</Text>
+          <Text style={{color:C.green,fontWeight:'800'}}>›</Text></View>
+        <Text style={[S.statValue,{fontSize:22}]}>{money(summary?.groceries_recorded)}</Text>
+        <Note>{state.pantry.filter(p=>p.available&&p.quantity>0).length} ingredients in your pantry · confirmed purchases only</Note>
+      </Pressable>
+
+      <View accessibilityLabel="Needs attention" style={{backgroundColor:PASTEL_RED,borderColor:RED_LINE,borderWidth:1,borderRadius:18,padding:15,gap:4}}>
+        <View style={S.between}><Text style={[S.title,{color:C.red}]}>Needs attention</Text>
+          <Text style={[S.muted,{color:C.red,fontWeight:'700'}]}>{items.length?`${items.length} TODAY`:'ALL GOOD'}</Text></View>
+        {items.length?items.map((it,i)=><Pressable key={it.key} accessibilityRole="button" onPress={it.go}
+          style={{flexDirection:'row',gap:10,paddingVertical:9,borderTopWidth:i?1:0,borderTopColor:RED_LINE,alignItems:'flex-start'}}>
+          <Text style={{width:22,textAlign:'center',color:C.red,fontWeight:'900',fontSize:15}}>{it.icon}</Text>
+          <View style={{flex:1,gap:2}}>
+            <Text style={[S.title,{fontSize:14}]}>{it.title}</Text>
+            <Text style={[S.muted,{color:'#7A4B4B'}]} numberOfLines={3}>{it.detail}</Text>
+          </View>
+          <Text style={{color:C.red,fontSize:18}}>›</Text>
+        </Pressable>):<Note>Nothing needs your attention right now.</Note>}
       </View>
-      <Note>Groceries are confirmed purchases, not a future spending forecast.</Note>
     </View>
-
-    <Card>
-      <View style={S.between}><Label>What needs attention?</Label><Text style={S.muted}>TODAY</Text></View>
-      <ActionRow icon="▤" title="Use what you have" subtitle={`${state.pantry.filter(item=>item.available&&item.quantity>0).length} ingredients available in your pantry`}
-        onPress={()=>router.navigate('/(tabs)/pantry')}/>
-      <ActionRow icon="◉" title="Improve your utility baseline" subtitle={state.bills.length?'Add another verified bill':'Add a water or electricity bill'}
-        onPress={()=>router.navigate('/(tabs)/utilities')}/>
-    </Card>
-
-    <Card>
-      <Label>Quick actions</Label>
-      <View style={S.statRow}>
-        <View style={{flex:1}}><Btn title="Add a bill" outline onPress={()=>router.push('/bill')}/></View>
-        <View style={{flex:1}}><Btn title="Scan receipt" outline onPress={()=>router.push('/receipt')}/></View>
-      </View>
-      <Btn title="Open AI Coach  ✦" onPress={()=>router.navigate('/(tabs)/coach')}/>
-    </Card>
-
-    <Card>
-      <Label>Your household</Label>
-      <Note>{state.household?.members||0} people · {state.household?.home_type||'Home not set'} · target {money(state.household?.monthly_target)}</Note>
-      <Btn title="Edit household details" outline onPress={()=>router.push('/onboarding')}/>
-    </Card>
-
-    {state.activity.length?<Card>
-      <View style={S.between}><Label>Recent activity</Label>
-        <Pressable accessibilityRole="button" onPress={()=>router.push('/activity')}><Text style={[S.muted,{color:C.green,fontWeight:'700'}]}>View all</Text></Pressable>
-      </View>
-      {state.activity.slice(0,2).map(activity=><View key={activity.id} style={{gap:3}}>
-        <Text style={S.body}>{activity.message}</Text><Note>{new Date(activity.at).toLocaleString()}</Note>
-      </View>)}
-    </Card>:null}
-
   </Page>;
 }

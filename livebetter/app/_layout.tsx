@@ -1,3 +1,4 @@
+import '../src/web-alert';
 import React from 'react';
 import {Stack} from 'expo-router';
 import {StatusBar} from 'expo-status-bar';
@@ -8,6 +9,8 @@ export default function RootLayout(){return <AppProvider><StatusBar style="dark"
     <Stack.Screen name="index" options={{headerShown:false}}/>
     <Stack.Screen name="welcome" options={{headerShown:false}}/>
     <Stack.Screen name="login" options={{headerShown:false}}/>
+    <Stack.Screen name="register" options={{headerShown:false}}/>
+    <Stack.Screen name="security" options={{headerShown:false}}/>
     <Stack.Screen name="onboarding" options={{headerShown:false}}/>
   </Stack>
 </AppProvider>;}

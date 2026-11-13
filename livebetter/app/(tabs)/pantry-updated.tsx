@@ -7,7 +7,7 @@ import {S,C} from '../../src/theme';
 
 export default function PantryUpdated(){
   const {state}=useApp();
-  const lastCook=state.activity.find(item=>item.kind==='cook');
+  const lastCook=state.activity.find(item=>item.kind==='cook'||item.kind==='recipe');
   return <Page title="Pantry updated" subtitle="Your meal is recorded and your remaining stock is up to date.">
     <View style={[S.card,{backgroundColor:C.softGreen,borderColor:C.softGreen,alignItems:'center',paddingVertical:24}]}>
       <Text style={{fontSize:32,color:C.green}}>✓</Text>

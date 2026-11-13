@@ -1,0 +1,4 @@
+tariff_code,declared_load,minimum_monthly_charge_rs
+110,up to 300 W,50.60
+120,301 W to 5000 W,211.60
+140,above 5000 W,424.35

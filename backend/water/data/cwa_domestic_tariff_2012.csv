@@ -1,0 +1,5 @@
+block_from_m3_per_month,block_to_m3_per_month,potable_rs_per_m3,wastewater_rs_per_m3
+0,10,6.0,7.5
+10,20,8.0,9.0
+20,50,17.0,20.0
+50,,32.0,45.0
