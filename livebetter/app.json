@@ -24,7 +24,8 @@
         {
           "cameraPermission": "LiveBetter uses the camera to photograph receipts and bills."
         }
-      ]
+      ],
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true

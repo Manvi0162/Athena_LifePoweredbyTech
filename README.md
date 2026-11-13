@@ -4,66 +4,70 @@ This repository contains the team project for the Life Powered by Tech hackathon
 
 ## Project structure
 
-- `livebetter/` — active mobile frontend app used for demo mode and live integration work
-- `LiveBetter_Frontend_Starter/` — starter project and installation guidance
-- `kentish/` — separate Expo experiment/prototype folder
+- `livebetter/` — active mobile frontend app used for the current demo and live integration work
+- `LiveBetter_Frontend_Starter/` — starter project and original installation notes
+- `kentish/` — separate Expo prototype/demo app
 - `README.md` — repo-level overview for the team
 
-## Frontend app overview
+## Current frontend app overview
 
-The app is a mobile-first household management dashboard designed for:
+This project is now the LiveBetter household management app. The main screens and flow reflect the current app state:
 
-- utility bill tracking for water and electricity
-- pantry and grocery management
-- household onboarding
-- recipe suggestions based on available pantry ingredients
-- AI coach guidance and utility scenarios
-- local demo persistence using AsyncStorage
+- welcome / login / register screens
+- onboarding household setup
+- home dashboard
+- utilities and utility detail pages for water and electricity
+- bill entry flow
+- pantry inventory and recipe recommendation flow
+- receipt capture / item confirmation flow
+- AI coach assistant
+- activity log
+- settings page
+- pantry updated confirmation screen
 
-The frontend intentionally works in demo mode without a backend so the team can validate UX, flows, and logic before the real services are connected.
+The app intentionally starts in demo mode so the team can test the UX without depending on a live backend.
 
 ## Main codebase explanation
 
 ### `livebetter/app/`
-This folder contains Expo Router screen files. Each file is a route/page.
+This folder contains the Expo Router pages and screen tree used by the app.
 
-- `app/index.tsx` — root route; redirects to the correct first screen
-- `app/welcome.tsx` — welcome screen with login/register choices
-- `app/login.tsx` — log-in screen (placeholder UI, not real auth)
-- `app/register.tsx` — sign-up screen placeholder
-- `app/onboarding.tsx` — multi-step household setup form
-- `app/(tabs)/...` — main tabbed app screens:
-  - home
-  - utilities
-  - water
-  - electricity
-  - bill
-  - pantry
-  - receipt
-  - recipe/[id]
-  - activity
-  - coach
-  - settings
-  - pantry-updated
+- `app/index.tsx` — root redirect for first-time entry
+- `app/welcome.tsx` — welcome page
+- `app/login.tsx` — login UI placeholder
+- `app/register.tsx` — registration UI placeholder
+- `app/onboarding.tsx` — multi-step household assessment
+- `app/(tabs)/home.tsx` — household dashboard
+- `app/(tabs)/utilities.tsx` — utility overview
+- `app/(tabs)/water.tsx` — water detail
+- `app/(tabs)/electricity.tsx` — electricity detail
+- `app/(tabs)/bill.tsx` — bill entry page
+- `app/(tabs)/pantry.tsx` — pantry inventory and recipe finder
+- `app/(tabs)/receipt.tsx` — add or review grocery receipt items
+- `app/(tabs)/recipe/[id].tsx` — recipe detail and cook action
+- `app/(tabs)/pantry-updated.tsx` — post-cook success screen
+- `app/(tabs)/coach.tsx` — AI coach assistant screen
+- `app/(tabs)/activity.tsx` — household history page
+- `app/(tabs)/settings.tsx` — settings screen
 
 ### `livebetter/src/`
-This folder contains the shared app logic and types.
+This folder contains the app logic shared across pages.
 
-- `src/context.tsx` — global application state and app actions (`useApp`)
-- `src/api.ts` — live backend integration layer and environment vars
-- `src/mock.ts` — demo-data generators, local persistence, mock forecasts, mock insights
-- `src/types.ts` — all shared data models (`Household`, `Bill`, `PantryItem`, `Recipe`, etc.)
-- `src/ui.tsx` — shared page shell, cards, buttons, fields, navigation bar
-- `src/theme.ts` — colors, spacing, typography, helper formatting
-- `src/components/utility-detail.tsx` — detail page for water/electricity
+- `src/context.tsx` — app-wide state and action handlers (`useApp`)
+- `src/api.ts` — live backend integration layer and `EXPO_PUBLIC_*` environment handling
+- `src/mock.ts` — mock/demo data, persistence, recipe generation, and forecast logic
+- `src/types.ts` — shared data contracts for households, bills, pantry, recipes, and activity
+- `src/ui.tsx` — shared UI shell: page layouts, cards, buttons, fields, tabs
+- `src/theme.ts` — styling constants and formatting helpers
+- `src/components/utility-detail.tsx` — reusable detail component for utility screens
 
 ### Config and project files
 
-- `app.json` — Expo app metadata, Android package id, camera permissions
+- `app.json` — Expo app metadata, permissions, package name
 - `eas.json` — EAS build config
-- `package.json` — app scripts and dependencies
-- `.env.local` — environment variables for mock/live backend switching
-- `tsconfig.json` — TypeScript config
+- `package.json` — scripts and dependencies
+- `.env.local` — demo/live environment values
+- `tsconfig.json` — TypeScript setup
 
 ## Installation and startup
 
@@ -113,64 +117,62 @@ npx expo start --clear
 
 ## App page flow and URL map
 
-The app uses Expo Router. The active route URLs are:
+The current app route structure is:
 
-| URL | File | Purpose |
+| URL | Page | Purpose |
 |---|---|---|
-| `/` | `app/index.tsx` | root redirect page |
-| `/welcome` | `app/welcome.tsx` | first entry screen |
-| `/login` | `app/login.tsx` | login placeholder screen |
-| `/register` | `app/register.tsx` | registration placeholder screen |
-| `/onboarding` | `app/onboarding.tsx` | household setup flow |
+| `/` | `app/index.tsx` | root redirect |
+| `/welcome` | `app/welcome.tsx` | first screen |
+| `/login` | `app/login.tsx` | login placeholder |
+| `/register` | `app/register.tsx` | register placeholder |
+| `/onboarding` | `app/onboarding.tsx` | household assessment |
 | `/(tabs)/home` | `app/(tabs)/home.tsx` | main dashboard |
 | `/(tabs)/utilities` | `app/(tabs)/utilities.tsx` | utility overview |
-| `/(tabs)/water` | `app/(tabs)/water.tsx` | water detail page |
-| `/(tabs)/electricity` | `app/(tabs)/electricity.tsx` | electricity detail page |
-| `/(tabs)/bill` | `app/(tabs)/bill.tsx` | add utility bill |
+| `/(tabs)/water` | `app/(tabs)/water.tsx` | water detail |
+| `/(tabs)/electricity` | `app/(tabs)/electricity.tsx` | electricity detail |
+| `/(tabs)/bill` | `app/(tabs)/bill.tsx` | add bill |
 | `/(tabs)/pantry` | `app/(tabs)/pantry.tsx` | pantry and recipe finder |
-| `/(tabs)/receipt` | `app/(tabs)/receipt.tsx` | add grocery receipt |
-| `/(tabs)/recipe/[id]` | `app/(tabs)/recipe/[id].tsx` | recipe details and cook flow |
-| `/(tabs)/pantry-updated` | `app/(tabs)/pantry-updated.tsx` | confirmation after cooking |
-| `/(tabs)/coach` | `app/(tabs)/coach.tsx` | AI coach chat |
-| `/(tabs)/activity` | `app/(tabs)/activity.tsx` | household log |
-| `/(tabs)/settings` | `app/(tabs)/settings.tsx` | settings and household info |
+| `/(tabs)/receipt` | `app/(tabs)/receipt.tsx` | review purchase receipt |
+| `/(tabs)/recipe/[id]` | `app/(tabs)/recipe/[id].tsx` | recipe details |
+| `/(tabs)/pantry-updated` | `app/(tabs)/pantry-updated.tsx` | cook confirmation |
+| `/(tabs)/coach` | `app/(tabs)/coach.tsx` | AI coach |
+| `/(tabs)/activity` | `app/(tabs)/activity.tsx` | household activity log |
+| `/(tabs)/settings` | `app/(tabs)/settings.tsx` | settings |
 
 ### Page flow
 
 ```text
 / -> index.tsx
-   -> if household exists: /(tabs)/home
-   -> otherwise: /welcome
+   -> if household is saved: /(tabs)/home
+   -> else: /welcome
 
 /welcome
    -> /login or /register
-
-/login or /register
-   -> user enters details (placeholder UI for now)
    -> /onboarding
 
 /onboarding
-   -> save household setup
+   -> save household details
    -> /(tabs)/home
 
 /(tabs)/home
-   -> utilities, pantry, coach, activity, settings
-   -> add bill: /(tabs)/bill
-   -> scan receipt: /(tabs)/receipt
-   -> view pantry recipe: /(tabs)/recipe/[id]
-   -> cook -> /(tabs)/pantry-updated
+   -> /(tabs)/utilities
+   -> /(tabs)/pantry
+   -> /(tabs)/coach
+   -> /(tabs)/activity
+   -> /(tabs)/settings
+   -> /(tabs)/bill
+   -> /(tabs)/receipt
+   -> /(tabs)/recipe/[id]
+   -> /(tabs)/pantry-updated
 
 /(tabs)/utilities
    -> /(tabs)/water or /(tabs)/electricity
-   -> /(tabs)/bill?kind=water|electricity
+   -> /(tabs)/bill
 
 /(tabs)/pantry
    -> /(tabs)/receipt
    -> /(tabs)/recipe/[id]
    -> /(tabs)/activity
-
-/(tabs)/coach
-   -> suggestions and scenario-based advice
 ```
 
 ## App behavior summary
