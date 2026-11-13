@@ -28,6 +28,7 @@ from electricity.api import router as electricity_router  # noqa: E402
 from food_recognition import food_router  # noqa: E402
 from integration.gateway import router as app_router  # noqa: E402
 from integration.security_routes import router as security_router  # noqa: E402
+from integration.extras import router as extras_router  # noqa: E402
 from pantry.router import router as household_router  # noqa: E402
 from receipts.router import router as receipts_router  # noqa: E402
 from recipes.router import router as recipes_router  # noqa: E402
@@ -49,6 +50,7 @@ def security_error(_: Request, exc: SecurityError):
 app.include_router(auth_router)
 app.include_router(app_router)
 app.include_router(security_router)
+app.include_router(extras_router)
 app.include_router(household_router)
 app.include_router(food_router)
 app.include_router(receipts_router)

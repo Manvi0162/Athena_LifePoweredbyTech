@@ -365,13 +365,14 @@ def coach(body: CoachIn):
     if result["intent"] != "what_if":
         result = C.rephrase(result, body.language)
     ctx.db.table("activity_logs").insert({"household_id": h["id"], "event_type": "coach.question",
-                                          "details": {"module": "big_brain", "intent": result["intent"],
+                                          "details": {"module": "big_brain", "intent": result["intent"], "question": body.message[:200],
                                                       "source": result["source"]}}).execute()
     return result
 
 
 # ---------------- activity ----------------
 SECURITY_LABELS = {
+    "coach.question": lambda d: f"Asked the AI coach: {d.get('question')}" if d.get("question") else "Asked the AI coach",
     "pattern_set": "Security pattern set", "pattern_changed": "Security pattern changed",
     "pattern_ok": "Pattern accepted to {what}", "pattern_failed": "Wrong pattern while trying to {what}",
     "pattern_locked": "Pattern locked for 5 minutes after 5 wrong tries ({what})",
@@ -382,6 +383,19 @@ SECURITY_LABELS = {
     "login_with_authenticator": "Logged in with Microsoft Authenticator",
     "account_reset": "Account reset (restorable for 24 hours)", "account_restored": "Account restored after a reset",
 }
+
+
+def _category(ev, d):
+    """Activity tab sections: ai, water, electricity, groceries, security, household."""
+    head = ev.split(".")[0]
+    if head in ("water", "electricity", "security", "ai"):
+        return head
+    if head == "coach" or (d or {}).get("module") == "big_brain":
+        return "ai"
+    if head in ("receipt_confirmed", "recipe_cooked", "pantry_updated", "pantry_added", "recipe_saved") or \
+            any(w in ev for w in ("receipt", "pantry", "recipe", "cook")):
+        return "groceries"
+    return (d or {}).get("module") if (d or {}).get("module") in ("water", "electricity", "groceries") else "household"
 
 
 def _security_label(ev, d):
@@ -433,7 +447,7 @@ def activity(limit: int = 100):
                    LABELS[ev](d) if ev in LABELS else ev.replace(".", ": ").replace("_", " ").capitalize())
         except Exception:
             msg = ev
-        out.append({"id": r["id"], "at": r["created_at"], "message": msg,
+        out.append({"id": r["id"], "at": r["created_at"], "message": msg, "category": _category(ev, d),
                     "kind": d.get("module") or ev.split(".")[0].split("_")[0], "event_type": ev, "details": d})
     return out
 

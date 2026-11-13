@@ -8,7 +8,7 @@ from core.llm import gemini_generate
 from .matching import FACTORS
 
 
-def generate_recipe(pantry, servings=4, allergies=None, diet='none'):
+def generate_recipe(pantry, servings=4, allergies=None, diet='none', must_use=None):
     if not pantry:
         raise ValueError('Pantry is empty. Confirm a grocery receipt first.')
     allergies = allergies or []
@@ -26,6 +26,7 @@ Do not claim ingredients are available unless listed in pantry.
 Avoid stated allergens, including hidden allergens in sauces and condiments.
 Do not make unsupported health or nutrition claims.
 Servings: {servings}. Diet: {diet}. Allergies: {json.dumps(allergies)}.
+{('The recipe MUST use: ' + json.dumps(must_use, ensure_ascii=False) + ' (the item the user wants to use now).') if must_use else ''}
 Pantry: {json.dumps(pantry, ensure_ascii=False)}"""
     result = json.loads(gemini_generate([prompt], json_output=True))
     if not isinstance(result, dict) or not str(result.get('name','')).strip():

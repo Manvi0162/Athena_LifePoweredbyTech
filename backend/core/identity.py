@@ -93,12 +93,13 @@ def resolve(token):
 
 
 def household(ctx: RequestContext | None):
-    """The caller's household (first one they own), or None before onboarding. Cached per request."""
+    """The caller's household (the newest one they own, e.g. the database team's seeded demo household),
+    or None before onboarding. Cached per request."""
     if ctx is None:
         return None
     if not ctx._looked_up:
         rows = (ctx.db.table("households").select("id,name,members,currency,preferences,budget_goals,created_at")
-                .eq("owner_id", ctx.user_id).order("created_at").limit(1).execute().data or [])
+                .eq("owner_id", ctx.user_id).order("created_at", desc=True).limit(1).execute().data or [])
         ctx._household, ctx._looked_up = (rows[0] if rows else None), True
     return ctx._household
 
