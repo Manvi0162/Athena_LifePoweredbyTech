@@ -81,3 +81,35 @@ def test_activity_sections_and_food_helpers(client):
     assert client.post("/recipes/generate", json={"ingredients": ["tomato"]}).status_code == 503   # needs Gemini
     r = client.post("/bills/parse", data={"kind": "water"}, files={"image": ("b.jpg", b"\xff\xd8\xff" + b"0" * 100, "image/jpeg")})
     assert r.status_code in (422, 503)
+
+
+def test_coach_what_if_budget(client):
+    from big_brain.whatif import parse
+    p = parse("if i shower 2min less per day, will it affect my budjet?", 4)
+    assert p[0]["kind"] == "shower" and p[0]["minutes"] == 2 and p[0]["people"] == 1
+    p = parse("What if we use the AC 1 hour less a day and switch off standby", 4)
+    assert [x["kind"] for x in p] == ["appliance", "standby"] and p[0]["appliance"] == "air_conditioner"
+    assert parse("What if 2 guests stay for 5 days?", 3)[0]["kind"] == "guests"
+    assert parse("iron 30 minutes less today", 3)[0]["hours"] == 0.5
+    client.post("/households/onboarding", json={"name": "Home", "members": 3, "home_type": "House",
+                                               "monthly_target": 9000, "water_budget": 100},
+                headers=_step_up(client))
+    client.post("/bills", json={"kind": "water", "period_start": "2026-08-13", "period_end": "2026-09-13", "units": 22})
+    client.post("/bills", json={"kind": "water", "period_start": "2026-09-13", "period_end": "2026-10-13", "units": 24})
+    client.post("/bills", json={"kind": "electricity", "period_start": "2026-09-01", "period_end": "2026-10-01", "units": 210})
+    r = client.post("/household/coach", json={"message": "if i shower 2min less per day, will it affect my budjet?"}).json()
+    c = r["changes"][0]
+    assert r["intent"] == "what_if" and c["status"] == "ok" and c["delta_rs"] < 0 and c["after_rs"] < c["before_rs"]
+    assert r["budget"]["lines"][0]["budget_rs"] == 100 and "budget" in r["answer"]
+    both = client.post("/household/coach", json={"message": "What if we use the AC 1 hour less a day and switch off standby"}).json()
+    assert [x["module"] for x in both["changes"]] == ["electricity", "electricity"]
+    assert all(x["delta_rs"] < 0 for x in both["changes"]) and "Together" in both["answer"]
+    today = client.post("/household/coach", json={"message": "what if I shower 5 minutes more today"}).json()["changes"][0]
+    assert today["unit_change"] > 0 and today["when"] == "for one day"
+
+
+def _step_up(c):
+    if not c.get("/security/status").json()["pattern_set"]:
+        c.put("/security/pattern", json={"pattern": [1, 2, 3, 6], "password": "demo1234"})
+    return {"X-Step-Up": c.post("/security/pattern/verify", json={"pattern": [1, 2, 3, 6],
+                                                                  "action": "edit_household"}).json()["step_up_token"]}

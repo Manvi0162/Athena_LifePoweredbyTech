@@ -44,7 +44,7 @@ export function Page({title,subtitle,children,back=true,showSettings,stickyFoote
     </KeyboardAvoidingView>
   </SafeAreaView>;
 }
-function BottomNavigation(){
+export function BottomNavigation(){
   const pathname=usePathname();
   const path=pathname.split('/').filter(Boolean).pop()||'home';
   const activeTab=path==='utilities'||path==='water'||path==='electricity'||path==='bill'||path==='habits'?'utilities'

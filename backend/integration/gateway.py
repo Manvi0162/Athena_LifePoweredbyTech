@@ -358,12 +358,11 @@ class CoachIn(BaseModel):
 
 @router.post("/household/coach")
 def coach(body: CoachIn):
+    """AI Coach (14 Nov): what-if questions about the bills and the budget, calculated by the module engines."""
     from big_brain import coach as C
-    from big_brain.service import build_dashboard
+    from big_brain import whatif
     ctx, h = require_household()
-    result = C.answer(build_dashboard(ctx, h, use_ai=False), body.message)
-    if result["intent"] != "what_if":
-        result = C.rephrase(result, body.language)
+    result = C.rephrase(whatif.answer(h, body.message), body.language)
     ctx.db.table("activity_logs").insert({"household_id": h["id"], "event_type": "coach.question",
                                           "details": {"module": "big_brain", "intent": result["intent"], "question": body.message[:200],
                                                       "source": result["source"]}}).execute()

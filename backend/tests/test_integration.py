@@ -196,11 +196,9 @@ def test_coach_uses_module_numbers(client):
     onboard(client)
     client.post("/bills", json={"kind": "water", "period_start": "2026-09-13", "period_end": "2026-10-13", "units": 24})
     a = client.post("/household/coach", json={"message": "How can I spend less?"}).json()
-    assert a["intent"] == "spend" and "Water estimate" in a["answer"]
+    assert a["intent"] == "help" and a["suggestions"]
     w = client.post("/household/coach", json={"message": "What if I use 10% less water?"}).json()
-    assert w["intent"] == "what_if" and "Before" in w["answer"]
-    d = client.post("/household/coach", json={"message": "What information is missing?"}).json()
-    assert d["intent"] == "data" and "unlock" in d["answer"].lower()
+    assert w["intent"] == "what_if" and w["changes"][0]["status"] == "ok" and w["changes"][0]["delta_rs"] <= 0
 
 
 def test_shared_tables_are_written(client):
