@@ -1,21 +1,37 @@
 import React,{useState} from 'react';
-import {Alert,Text} from 'react-native';
+import {Alert,Text,View} from 'react-native';
 import {router} from 'expo-router';
 import {useApp} from '../src/context';
 import {Btn,Card,Field,Label,Note,Page} from '../src/ui';
-export default function Login(){const {demo}=useApp();
-  const [email,setEmail]=useState(''),[password,setPassword]=useState('');
-  return <Page title="Welcome to LiveBetter" subtitle="Plan household expenses. Waste less. Make decisions with evidence.">
-    <Card><Label>Try the application</Label>
-      <Note>{demo?'A fictional local account is provided for judging the interface before backend integration.':'Developer testing only. Production identity verification is not wired.'}</Note>
-      <Btn title={demo?'Continue as demo household':'Continue to assessment (developer preview)'} onPress={()=>router.push('/onboarding')}/>
+import {C,S} from '../src/theme';
+
+export default function Login(){
+  const {demo}=useApp();
+  const [email,setEmail]=useState('');
+  const [password,setPassword]=useState('');
+  return <Page back title="Welcome back"
+    subtitle="Your household, all in one place.">
+    <ViewIntro/>
+    <Card>
+      <Label>Sign in</Label>
+      <Field label="Email address" value={email} onChangeText={setEmail}
+        placeholder="you@example.com" keyboardType="email-address"/>
+      <Field label="Password" value={password} onChangeText={setPassword}
+        secureTextEntry placeholder="Enter your password"/>
+      <Btn title="Sign in" onPress={()=>Alert.alert('Sign-in unavailable',
+        'Account authentication is not connected in this preview. Continue with the demo household instead.')}/>
+      <Btn title="Continue with demo household" outline
+        onPress={()=>router.push('/onboarding')}/>
+      <Note>{demo?'Demo mode uses fictional local data.':'Sign-in and secure account storage are not connected in this build.'}</Note>
     </Card>
-    <Card><Label>Sign in — integration pending</Label>
-      <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address"/>
-      <Field label="Password" value={password} onChangeText={setPassword} secureTextEntry/>
-      <Btn title="Sign in" outline onPress={()=>Alert.alert('Auth not connected',
-        'This is the sign-in UI only. Member 2 must integrate Supabase Auth and backend household authorization before production sign-in works.')}/>
-      <Note>Do not enter a real password here. This build does not authenticate or securely store login credentials.</Note>
-    </Card>
+    <Text style={[S.muted,{textAlign:'center'}]}>New here? Set up your household to begin.</Text>
+    <Btn title="Set up my household" outline onPress={()=>router.push('/onboarding')}/>
   </Page>;
+}
+
+function ViewIntro(){
+  return <View style={[S.card,{backgroundColor:C.softGreen,borderColor:C.softGreen}]}>
+    <Text style={[S.title,{color:C.green}]}>Start with what matters at home.</Text>
+    <Note>Water, electricity and groceries, organized around your household.</Note>
+  </View>;
 }

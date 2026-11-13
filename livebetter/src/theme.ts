@@ -1,10 +1,10 @@
 import { StyleSheet } from 'react-native';
-export const C = { bg:'#F5F8F6', ink:'#17312F', muted:'#71817C', green:'#07856E', mint:'#DDF4EA',
-  white:'#FFFFFF', line:'#E5EDE8', blue:'#E8F3F8', amber:'#FFF3D8', red:'#9B3333', dangerBg:'#FFF0F0',
-  navy:'#173946', softGreen:'#E2F5ED', softBlue:'#EAF4F8', softAmber:'#FFF5E1' };
+export const C = { bg:'#F2F7F8', ink:'#0B2433', muted:'#718493', green:'#079C89', mint:'#DDF5EE',
+  white:'#FFFFFF', line:'#DCE8EB', blue:'#E7F4F7', amber:'#FFF1D8', red:'#9B3333', dangerBg:'#FFF0F0',
+  navy:'#14283D', softGreen:'#E5F6F0', softBlue:'#EAF4F8', softAmber:'#FFF5E6' };
 export const S = StyleSheet.create({
   screen:{flex:1,backgroundColor:C.bg},
-  content:{width:'100%',maxWidth:480,alignSelf:'center',paddingHorizontal:20,paddingTop:12,paddingBottom:32,gap:16},
+  content:{width:'100%',maxWidth:440,alignSelf:'center',paddingHorizontal:18,paddingTop:10,paddingBottom:32,gap:15},
   brandRow:{flexDirection:'row',alignItems:'center',gap:9,marginBottom:2},
   brandMark:{width:30,height:30,borderRadius:10,backgroundColor:C.green,alignItems:'center',justifyContent:'center'},
   brandInitial:{fontSize:13,fontWeight:'900',color:C.white},
@@ -37,6 +37,20 @@ export const S = StyleSheet.create({
   actionIcon:{width:36,height:36,borderRadius:12,backgroundColor:C.softGreen,alignItems:'center',justifyContent:'center'},
   actionIconText:{fontSize:16},
   actionArrow:{fontSize:22,fontWeight:'400',color:C.muted},
+  screenHeader:{flexDirection:'row',alignItems:'center',justifyContent:'space-between',gap:12},
+  topAction:{width:36,height:36,borderRadius:18,backgroundColor:C.white,borderWidth:1,borderColor:C.line,alignItems:'center',justifyContent:'center'},
+  topActionText:{fontSize:16,color:C.ink,fontWeight:'700'},
+  progressTrack:{height:5,borderRadius:5,backgroundColor:'#DFE9EC',overflow:'hidden'},
+  progressFill:{height:'100%',borderRadius:5,backgroundColor:C.green},
+  choiceRow:{flexDirection:'row',flexWrap:'wrap',gap:8},
+  choice:{borderRadius:12,borderWidth:1,borderColor:C.line,backgroundColor:C.white,paddingVertical:10,paddingHorizontal:13},
+  choiceSelected:{backgroundColor:C.mint,borderColor:C.green},
+  choiceText:{fontSize:13,fontWeight:'700',color:C.muted},
+  choiceTextSelected:{color:C.green},
+  chatBubble:{maxWidth:'88%',paddingHorizontal:14,paddingVertical:11,borderRadius:17,gap:5},
+  chatBubbleText:{fontSize:14,lineHeight:21,color:C.ink},
+  chatComposer:{flexDirection:'row',alignItems:'center',gap:8},
+  chatInput:{flex:1,minHeight:44,maxHeight:96,borderWidth:1,borderColor:C.line,borderRadius:14,paddingHorizontal:13,paddingVertical:10,color:C.ink,backgroundColor:C.bg,fontSize:14},
   tabIcon:{width:34,height:25,borderRadius:10,alignItems:'center',justifyContent:'center'},
   tabIconText:{fontSize:16,fontWeight:'800'},
 });

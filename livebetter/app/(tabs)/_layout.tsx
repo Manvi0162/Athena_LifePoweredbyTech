@@ -11,4 +11,12 @@ export default function TabLayout(){return <Tabs screenOptions={{headerShown:fal
   <Tabs.Screen name="utilities" options={{title:'Utilities',tabBarIcon:({focused})=><View style={[S.tabIcon,focused&&{backgroundColor:C.mint}]}><Text style={[S.tabIconText,{color:focused?C.green:C.muted}]}>◉</Text></View>}}/>
   <Tabs.Screen name="pantry" options={{title:'Pantry',tabBarIcon:({focused})=><View style={[S.tabIcon,focused&&{backgroundColor:C.mint}]}><Text style={[S.tabIconText,{color:focused?C.green:C.muted}]}>▤</Text></View>}}/>
   <Tabs.Screen name="coach" options={{title:'Coach',tabBarIcon:({focused})=><View style={[S.tabIcon,focused&&{backgroundColor:C.mint}]}><Text style={[S.tabIconText,{color:focused?C.green:C.muted}]}>✦</Text></View>}}/>
+  <Tabs.Screen name="water" options={{tabBarButton:()=>null}}/>
+  <Tabs.Screen name="electricity" options={{tabBarButton:()=>null}}/>
+  <Tabs.Screen name="bill" options={{tabBarButton:()=>null}}/>
+  <Tabs.Screen name="receipt" options={{tabBarButton:()=>null}}/>
+  <Tabs.Screen name="activity" options={{tabBarButton:()=>null}}/>
+  <Tabs.Screen name="settings" options={{tabBarButton:()=>null}}/>
+  <Tabs.Screen name="pantry-updated" options={{tabBarButton:()=>null}}/>
+  <Tabs.Screen name="recipe/[id]" options={{tabBarButton:()=>null}}/>
 </Tabs>;}

@@ -1,56 +1,100 @@
-# Welcome to your Expo app 👋
+# LiveBetter frontend
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+This is the Expo frontend for the Athena LifePoweredbyTech project. It is a mobile-first React Native app built for the hackathon demo and allows local testing without a backend.
 
-## Get started
+## What this app does
 
-1. Install dependencies
+- local household onboarding and demo state
+- utility bill tracking for water and electricity
+- pantry and receipt workflows
+- recipe suggestions and cook actions
+- activity log and AI coach recommendations
+- mock/demo mode for offline local testing
 
-   ```bash
-   npm install
-   ```
+## Prerequisites
 
-2. Start the app
+- Node.js LTS (18+ recommended; 20 LTS preferred)
+- npm
+- Git
+- Expo Go on an Android device, or Android Studio / iOS simulator
 
-   ```bash
-   npx expo start
-   ```
+## Install
 
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **src/app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+From the repo root:
 
 ```bash
-npm run reset-project
+cd Athena_LifePoweredbyTech/livebetter
+npm install
 ```
 
-This command will move the starter code to the **example** directory and create a blank **src/app** directory where you can start developing.
+Create a local environment file:
 
-### Other setup steps
+```bash
+copy NUL .env.local
+```
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+Add the following contents:
 
-## Learn more
+```env
+EXPO_PUBLIC_USE_MOCKS=true
+EXPO_PUBLIC_API_URL=https://your-fastapi-host.example
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+For an offline demo, keep `EXPO_PUBLIC_USE_MOCKS=true`.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+If a real backend is ready later, switch to:
 
-## Join the community
+```env
+EXPO_PUBLIC_USE_MOCKS=false
+EXPO_PUBLIC_API_URL=https://your-fastapi-host.example
+```
 
-Join our community of developers creating universal apps.
+## Run the app
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Start the Expo dev server:
+
+```bash
+npx expo start
+```
+
+Then:
+
+- scan the QR code with Expo Go on your Android phone
+- or run the app in a browser with `npx expo start --web`
+- or run Android Studio / iOS simulator with `npm run android` / `npm run ios`
+
+If the device cannot reach the dev machine, use:
+
+```bash
+npx expo start --tunnel
+```
+
+## Quick test flow
+
+1. Launch the app.
+2. Complete the onboarding screen.
+3. Open Utilities and add a sample water bill and electricity bill.
+4. Open Pantry and add a sample receipt.
+5. Confirm inventory updates.
+6. Use a recipe and mark it as cooked.
+7. Open the Activity and AI Coach sections to confirm data flows.
+
+## Backend integration
+
+The app checks `EXPO_PUBLIC_API_URL` and `EXPO_PUBLIC_USE_MOCKS` in `src/api.ts`.
+
+- Demo mode: `EXPO_PUBLIC_USE_MOCKS=true`
+- Live mode: `EXPO_PUBLIC_USE_MOCKS=false` with a real HTTPS host
+
+Do not use `localhost` on a physical phone. Use the deployed API URL instead.
+
+## Troubleshooting
+
+- Clear Metro cache: `npx expo start --clear`
+- Install missing Expo-compatible packages: `npx expo install`
+- Check TypeScript: `npx tsc --noEmit`
+- If the app cannot connect to API: verify the server is reachable and using HTTPS
+
+## Development notes
+
+This is a hackathon frontend intended to work in mock mode until backend services are available. The goal is to let the team develop and test the UI without blocking on backend dependencies.

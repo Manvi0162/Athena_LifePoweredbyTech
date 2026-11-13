@@ -1,59 +1,124 @@
 import React,{useEffect,useState} from 'react';
-import {Alert,Text,View} from 'react-native';
+import {Alert,Pressable,Text,View} from 'react-native';
 import {router} from 'expo-router';
 import {useApp} from '../../src/context';
 import {PantryItem,Recipe} from '../../src/types';
 import {S,C} from '../../src/theme';
-import {Btn,Card,Field,Label,Loading,Note,Page} from '../../src/ui';
-export default function Pantry(){const {state,addItem,recipes,cook,demo,refreshPantry}=useApp();
-  const [list,setList]=useState<Recipe[]>([]),[loading,setLoading]=useState(true),[editing,setEditing]=useState<string|null>(null);
-  const [name,setName]=useState(''),[qty,setQty]=useState('1'),[unit,setUnit]=useState('piece'),[expiry,setExpiry]=useState('');
-  useEffect(()=>{let active=true;setLoading(true);recipes().then(v=>{if(active)setList(v);})
-    .catch(()=>{}).finally(()=>{if(active)setLoading(false);});return()=>{active=false;};},[state]);
-  useEffect(()=>{if(!demo)refreshPantry().catch(()=>{});},[]);
-  function edit(p:PantryItem){setEditing(p.id);setName(p.name);setQty(String(p.quantity));setUnit(p.unit);setExpiry(p.expiry||'');}
-  function clear(){setEditing(null);setName('');setQty('1');setUnit('piece');setExpiry('');}
-  async function save(){const n=Number(qty);if(!name.trim()||!unit.trim()||!Number.isFinite(n)||n<0||
-    (expiry&&!/^\d{4}-\d{2}-\d{2}$/.test(expiry)))return Alert.alert('Check item','Valid name, unit, non-negative quantity and optional YYYY-MM-DD expiry are required.');
-    try{await addItem({id:editing||undefined,name:name.trim(),quantity:n,unit:unit.trim(),expiry:expiry||undefined,available:n>0});clear();}
-    catch(e){Alert.alert('Inventory save failed',String(e));}}
-  async function toggle(item:PantryItem){try{await addItem({...item,available:!item.available});}
-    catch(e){Alert.alert('Could not update',String(e));}}
-  function confirmCook(recipe:Recipe){if(recipe.missing.length)return Alert.alert('Missing ingredients','Add or correct the required inventory first.');
-    Alert.alert('Confirm cooking',`Deduct ingredients for ${recipe.name}? This does not create a new expense.`,[
-      {text:'Cancel',style:'cancel'},
-      {text:'Cooked',onPress:async()=>{try{await cook(recipe.id,`cook-${Date.now()}-${Math.random()}`);}
-        catch(e){Alert.alert('Cooking failed',String(e));}}}
-    ]);
+import {ActionRow,Btn,Card,Field,Label,Loading,Note,Page} from '../../src/ui';
+
+export default function Pantry(){
+  const {state,addItem,recipes,demo,refreshPantry}=useApp();
+  const [list,setList]=useState<Recipe[]|null>(null);
+  const [editing,setEditing]=useState<string|null>(null);
+  const [formOpen,setFormOpen]=useState(false);
+  const [search,setSearch]=useState('');
+  const [name,setName]=useState('');
+  const [qty,setQty]=useState('1');
+  const [unit,setUnit]=useState('piece');
+  const [expiry,setExpiry]=useState('');
+  const available=state.pantry.filter(item=>item.available&&item.quantity>0);
+  const filteredRecipes=(list||[]).filter(recipe=>recipe.name.toLowerCase().includes(search.trim().toLowerCase()));
+
+  useEffect(()=>{
+    let active=true;
+    recipes().then(value=>{if(active)setList(value);})
+      .catch(error=>{if(active){setList([]);Alert.alert('Recipes unavailable',String(error));}});
+    return()=>{active=false;};
+  },[recipes,state]);
+
+  useEffect(()=>{if(!demo)refreshPantry().catch(error=>Alert.alert('Pantry unavailable',String(error)));},[demo,refreshPantry]);
+
+  function edit(item:PantryItem){
+    setEditing(item.id);setName(item.name);setQty(String(item.quantity));setUnit(item.unit);
+    setExpiry(item.expiry||'');setFormOpen(true);
   }
-  return <Page title="Smart pantry" subtitle="Your actual inventory is the basis for recipe suggestions.">
-    <Btn title="📷 Import groceries / receipt" onPress={()=>router.push('/receipt')}/>
-    <Card><Label>Available ingredients ({state.pantry.filter(x=>x.available&&x.quantity>0).length})</Label>
-      {!state.pantry.length?<Note>No stock yet. Add items manually or confirm a receipt.</Note>:null}
-      {state.pantry.map(item=><View key={item.id} style={{gap:5,paddingBottom:10,borderBottomColor:C.line,borderBottomWidth:1}}>
-        <View style={S.between}><Text style={S.title}>{item.name}</Text><Text style={S.body}>{item.quantity} {item.unit}</Text></View>
-        <Note>{item.available?'Available':'Marked unavailable'}{item.expiry?` · Expiry ${item.expiry}`:''}</Note>
-        <Btn title="Edit quantity / expiry" outline onPress={()=>edit(item)}/>
-        <Btn title={item.available?'Mark unavailable':'Mark available'} outline onPress={()=>toggle(item)}/>
-      </View>)}
+  function clear(){
+    setEditing(null);setName('');setQty('1');setUnit('piece');setExpiry('');setFormOpen(false);
+  }
+  async function save(){
+    const quantity=Number(qty);
+    if(!name.trim()||!unit.trim()||!Number.isFinite(quantity)||quantity<0||
+      (expiry&&!/^\d{4}-\d{2}-\d{2}$/.test(expiry)))
+      return Alert.alert('Check item','Enter a name, unit, non-negative quantity and optional YYYY-MM-DD expiry.');
+    try{
+      await addItem({id:editing||undefined,name:name.trim(),quantity,unit:unit.trim(),
+        expiry:expiry||undefined,available:quantity>0});
+      clear();
+    }catch(error){Alert.alert('Inventory save failed',String(error));}
+  }
+  async function toggle(item:PantryItem){
+    try{await addItem({...item,available:!item.available});}
+    catch(error){Alert.alert('Could not update item',String(error));}
+  }
+
+  return <Page title="Your smart pantry" subtitle="Know what is in your kitchen and use it well." showSettings>
+    <View style={[S.card,{backgroundColor:C.softGreen,borderColor:C.softGreen}]}>
+      <View style={S.between}>
+        <View><Text style={S.statLabel}>AVAILABLE INGREDIENTS</Text><Text style={[S.amount,{fontSize:27}]}>{available.length} items</Text></View>
+        <Text style={{fontSize:28}}>▤</Text>
+      </View>
+      <Note>Use what you already have before your next shop.</Note>
+    </View>
+
+    <Card>
+      <Label>Your ingredients</Label>
+      <View style={S.row}>
+        <View style={{flex:1}}><Btn title="Scan receipt" onPress={()=>router.push('/receipt')}/></View>
+        <View style={{flex:1}}><Btn title="+ Add item" outline onPress={()=>{setFormOpen(true);setEditing(null);}}/></View>
+      </View>
+      {state.pantry.length?state.pantry.map(item=><View key={item.id} style={{paddingVertical:10,borderBottomWidth:1,borderBottomColor:C.line,gap:7}}>
+        <View style={S.between}>
+          <View style={{flex:1,gap:2}}>
+            <Text style={S.title}>{capitalize(item.name)}</Text>
+            <Note>{item.quantity} {item.unit}{item.expiry?` · Expires ${item.expiry}`:''}</Note>
+          </View>
+          <Text style={[S.muted,{color:item.available&&item.quantity>0?C.green:C.muted,fontWeight:'700'}]}>
+            {item.available&&item.quantity>0?'AVAILABLE':'UNAVAILABLE'}
+          </Text>
+        </View>
+        <View style={S.row}>
+          <Pressable accessibilityRole="button" onPress={()=>edit(item)} style={{paddingVertical:6,paddingRight:12}}>
+            <Text style={{color:C.green,fontWeight:'700'}}>Edit</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" onPress={()=>void toggle(item)} style={{paddingVertical:6,paddingHorizontal:8}}>
+            <Text style={S.muted}>{item.available?'Mark unavailable':'Restore item'}</Text>
+          </Pressable>
+        </View>
+      </View>):<Note>Your pantry is empty. Add an item or confirm a grocery receipt.</Note>}
     </Card>
-    <Card><Label>{editing?'Edit ingredient':'Add an ingredient'}</Label>
+
+    {formOpen?<Card>
+      <Label>{editing?'Update ingredient':'Add an ingredient'}</Label>
       <Field label="Ingredient name" value={name} onChangeText={setName}/>
-      <Field label="Quantity" value={qty} onChangeText={setQty} keyboardType="decimal-pad"/>
-      <Field label="Unit (kg, piece, L...)" value={unit} onChangeText={setUnit}/>
-      <Field label="Expiry date (optional YYYY-MM-DD)" value={expiry} onChangeText={setExpiry}/>
-      <Btn title={editing?'Save change':'Add ingredient'} onPress={save}/>
-      {editing?<Btn title="Cancel editing" outline onPress={clear}/>:null}
+      <View style={S.row}>
+        <View style={{flex:1}}><Field label="Quantity" value={qty} onChangeText={setQty} keyboardType="decimal-pad"/></View>
+        <View style={{flex:1}}><Field label="Unit" value={unit} onChangeText={setUnit} placeholder="kg, piece, L"/></View>
+      </View>
+      <Field label="Expiry date (optional · YYYY-MM-DD)" value={expiry} onChangeText={setExpiry}/>
+      <Btn title={editing?'Save changes':'Add to pantry'} onPress={()=>void save()}/>
+      <Btn title="Cancel" outline onPress={clear}/>
+    </Card>:null}
+
+    <Card>
+      <View style={S.between}><Label>Find recipes from your pantry</Label><Text style={S.muted}>{filteredRecipes.length} recipes</Text></View>
+      <Field label="Search recipes" value={search} onChangeText={setSearch} placeholder="Search recipe names"/>
+      {list===null?<Loading/>:filteredRecipes.length?filteredRecipes.map(recipe=><Pressable key={recipe.id}
+        accessibilityRole="button" onPress={()=>router.push({pathname:'/recipe/[id]',params:{id:recipe.id}})}
+        style={{paddingVertical:12,borderBottomWidth:1,borderBottomColor:C.line}}>
+        <View style={S.between}>
+          <Text style={[S.title,{flex:1}]}>{recipe.name}</Text>
+          <Text style={{color:C.green,fontSize:19}}>›</Text>
+        </View>
+        <Note>{Math.round(recipe.coverage*100)}% available · {recipe.missing.length?`Missing ${recipe.missing.join(', ')}`:'Ready to cook'}</Note>
+      </Pressable>):<Note>No matching recipes. Try another search or add more pantry ingredients.</Note>}
+      {demo?<Note>Recipe samples are illustrative demo data, not a licensed recipe dataset.</Note>:null}
     </Card>
-    <Card><Label>Recipes ranked by ingredient coverage</Label>
-      {demo?<Note>DEMO RECIPE SAMPLES: Not the required authentic UniTools recipe dataset. Member 4 must connect the real dataset-powered endpoint.</Note>:null}
-      {loading?<Loading/>:list.length?list.map(recipe=><View key={recipe.id} style={{gap:6,paddingBottom:14,borderBottomWidth:1,borderBottomColor:C.line}}>
-        <Text style={S.title}>{recipe.name} · {Math.round(recipe.coverage*100)}% covered</Text>
-        <Note>Requires: {recipe.ingredients.map(i=>`${i.quantity} ${i.unit} ${i.name}`).join(', ')}</Note>
-        <Note>{recipe.missing.length?`Missing: ${recipe.missing.join(', ')}`:'All listed ingredients available'}</Note>
-        <Note>{recipe.instructions}</Note><Note>Source: {recipe.source}</Note>
-        <Btn title={recipe.missing.length?'Missing ingredients':'✓ I cooked this — deduct stock'} disabled={!!recipe.missing.length} onPress={()=>confirmCook(recipe)}/>
-      </View>):<Note>No recipes returned. Check backend availability or add inventory.</Note>}
+
+    <Card>
+      <ActionRow icon="◷" title="Household activity" subtitle="See pantry and grocery updates"
+        onPress={()=>router.push('/activity')}/>
     </Card>
   </Page>;
 }
+
+function capitalize(value:string){return value.charAt(0).toUpperCase()+value.slice(1);}

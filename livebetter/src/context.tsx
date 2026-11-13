@@ -54,12 +54,12 @@ export function AppProvider({children}:{children:React.ReactNode}){
     }
     await commit(putPantry(state,v));
   });
-  const refreshPantry=async()=>{
+  const refreshPantry=useCallback(async()=>{
     if(DEMO_MODE)return;
     const result=await request<PantryItem[]|{items:PantryItem[]}>(`${routes.pantry}?household_id=${encodeURIComponent(householdId)}`);
     const items=Array.isArray(result)?result:result.items;
     setState(old=>({...old,pantry:items}));
-  };
+  },[householdId]);
   const confirmReceipt=async(items:ReceiptItem[],receiptId?:string)=>execute(async()=>{
     if(!DEMO_MODE){await request(routes.confirm,'POST',{household_id:householdId,receipt_id:receiptId,items});await refreshPantry();return;}
     await commit(putReceipt(state,items));

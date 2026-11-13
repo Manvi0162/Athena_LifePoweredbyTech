@@ -2,11 +2,11 @@ import React,{useState} from 'react';
 import {Alert,Image,Text,View} from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import {router} from 'expo-router';
-import {useApp} from '../src/context';
-import {sampleReceipt} from '../src/mock';
-import {ReceiptItem} from '../src/types';
-import {money,S} from '../src/theme';
-import {Btn,Card,Field,Note,Page} from '../src/ui';
+import {useApp} from '../../src/context';
+import {sampleReceipt} from '../../src/mock';
+import {ReceiptItem} from '../../src/types';
+import {money,S} from '../../src/theme';
+import {Btn,Card,Field,Note,Page} from '../../src/ui';
 export default function Receipt(){const {demo,parseReceipt,confirmReceipt}=useApp();
   const [image,setImage]=useState<string|null>(null);const [items,setItems]=useState<ReceiptItem[]>([]);
   const [receiptId,setReceiptId]=useState<string|undefined>();
@@ -29,7 +29,7 @@ export default function Receipt(){const {demo,parseReceipt,confirmReceipt}=useAp
       return Alert.alert('Check items','Names and units are required. Quantity must be positive and line price cannot be negative.');
     try{await confirmReceipt(items,receiptId);router.replace('/(tabs)/pantry');}
     catch(e){Alert.alert('Could not save receipt',String(e));}}
-  return <Page title="Grocery receipt" subtitle="Scan, review, correct, then confirm inventory and purchases.">
+  return <Page back title="Add your groceries" subtitle="Scan, review and correct each item before you save.">
     <Card><Btn title="📷 Take receipt photo" onPress={()=>choose(true)}/>
       <Btn title="Choose image from gallery" outline onPress={()=>choose(false)}/>
       {image?<Image source={{uri:image}} style={{height:190,borderRadius:10}} resizeMode="contain"/>:null}

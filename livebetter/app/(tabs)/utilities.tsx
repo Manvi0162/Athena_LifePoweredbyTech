@@ -1,46 +1,54 @@
 import React,{useEffect,useState} from 'react';
-import {Alert,Text,View} from 'react-native';
+import {ActivityIndicator,Pressable,Text,View} from 'react-native';
 import {router} from 'expo-router';
 import {useApp} from '../../src/context';
-import {Forecast,Scenario,UtilityKind} from '../../src/types';
+import {Forecast,UtilityKind} from '../../src/types';
 import {money,S,C} from '../../src/theme';
-import {Btn,Card,Field,Label,Loading,Note,Page} from '../../src/ui';
-export default function Utilities(){const {state,forecast,scenario}=useApp();
-  const [data,setData]=useState<{water?:Forecast;electricity?:Forecast}>({});const [loading,setLoading]=useState(true);
-  const [kind,setKind]=useState<UtilityKind>('electricity'),[reduction,setReduction]=useState('10');
-  const [result,setResult]=useState<Scenario|null>(null);
-  useEffect(()=>{let active=true;setLoading(true);Promise.all([forecast('water'),forecast('electricity')])
-    .then(([water,electricity])=>{if(active)setData({water,electricity});}).catch(e=>{if(active)Alert.alert('Forecast unavailable',String(e));})
-    .finally(()=>{if(active)setLoading(false);});return()=>{active=false;};},[state]);
-  async function run(){const p=Number(reduction);if(!Number.isFinite(p)||p<=0||p>100)
-    return Alert.alert('Invalid reduction','Enter a percentage between 0 and 100.');
-    try{setResult(await scenario(kind,p));}catch(e){Alert.alert('Scenario unavailable',String(e));}
-  }
-  return <Page title="Utility intelligence" subtitle="Water and electricity, based on actual recorded billing periods.">
-    <Btn title="+ Add water / electricity bill" onPress={()=>router.push('/bill')}/>
-    {loading?<Loading/>:([['water','💧 Water'],['electricity','⚡ Electricity']] as const).map(([category,label])=>{
-      const f=data[category];return <Card key={category}>
-        <Label>{label}</Label><Text style={S.amount}>{money(f?.value)}</Text>
-        <Note>{f?`${f.units} ${f.unit} · ${f.period_start} to ${f.period_end}`:'No forecast yet'}</Note>
-        <View style={[S.tag,{backgroundColor:C.amber}]}><Text style={S.muted}>Confidence: {f?.confidence||'unknown'}</Text></View>
-        <Note>Method: {f?.method||'Unavailable'}</Note>
-        {f?.assumptions?.map((a,i)=><Note key={i}>• {a}</Note>)}
-        <Note>Bill records: {f?.source_data.length||0}</Note>
-      </Card>;
-    })}
-    <Card><Label>What-if usage planner</Label>
-      <Note>Choose a category and a hypothetical consumption reduction. Offline mode does not invent cost savings.</Note>
-      <Btn title={kind==='water'?'✓ Water':'Water'} outline={kind!=='water'} onPress={()=>{setKind('water');setResult(null);}}/>
-      <Btn title={kind==='electricity'?'✓ Electricity':'Electricity'} outline={kind!=='electricity'} onPress={()=>{setKind('electricity');setResult(null);}}/>
-      <Field label="Reduction in usage (%)" value={reduction} onChangeText={setReduction} keyboardType="decimal-pad"/>
-      <Btn title="Calculate scenario" onPress={run}/>
-      {result?<View style={{gap:7}}><View style={S.divider}/><Label>Scenario result</Label>
-          <Note>Baseline cost: {money(result.baseline)}</Note><Note>Adjusted cost: {money(result.adjusted)}</Note>
-          <Note>Estimated money difference: {money(result.delta)}</Note>
-          <Note>Illustrative unit change: {result.unit_change??'Unavailable'}</Note>
-          <Text style={S.body}>{result.message}</Text>
-          {result.assumptions.map((a,i)=><Note key={i}>• {a}</Note>)}
-        </View>:null}
+import {ActionRow,Card,Label,Note,Page} from '../../src/ui';
+
+export default function Utilities(){
+  const {state,forecast}=useApp();
+  const [data,setData]=useState<Partial<Record<UtilityKind,Forecast>>>({});
+  const [loading,setLoading]=useState(true);
+
+  useEffect(()=>{
+    let active=true;
+    Promise.all([forecast('water'),forecast('electricity')])
+      .then(([water,electricity])=>{if(active)setData({water,electricity});})
+      .catch(error=>{if(active)setData({});console.warn('Could not load utility forecasts',error);})
+      .finally(()=>{if(active)setLoading(false);});
+    return()=>{active=false;};
+  },[forecast,state]);
+
+  return <Page title="Your utilities" subtitle="Separate baselines for water and electricity." showSettings>
+    <Card>
+      <Label>Next billing cycle</Label>
+      <Note>Forecasts use recorded bills where available. They are not live meter readings.</Note>
+      {loading?<ActivityIndicator color={C.green}/>:null}
+      {(['water','electricity'] as const).map(kind=>{
+        const forecastData=data[kind];
+        const isWater=kind==='water';
+        return <Pressable key={kind} accessibilityRole="button"
+          onPress={()=>router.push(isWater?'/water':'/electricity')}
+          style={{padding:14,borderRadius:17,backgroundColor:isWater?C.softBlue:C.softAmber,gap:8}}>
+          <View style={S.between}>
+            <Text style={S.title}>{isWater?'◉  Water':'ϟ  Electricity'}</Text>
+            <Text style={[S.muted,{color:C.green,fontWeight:'700'}]}>VIEW DETAILS  ›</Text>
+          </View>
+          <Text style={[S.amount,{color:C.ink,fontSize:23}]}>{forecastData?.value==null?'No forecast yet':money(forecastData.value)}</Text>
+          <Note>{forecastData?`${forecastData.units} ${forecastData.unit} · ${forecastData.period_start} to ${forecastData.period_end}`:'Add a bill to start your baseline'}</Note>
+        </Pressable>;
+      })}
     </Card>
+
+    <Card>
+      <Label>Improve your baseline</Label>
+      <ActionRow icon="＋" title="Add a water bill" subtitle="Record a verified billing period"
+        onPress={()=>router.push({pathname:'/bill',params:{kind:'water'}})}/>
+      <ActionRow icon="＋" title="Add an electricity bill" subtitle="Record a verified billing period"
+        onPress={()=>router.push({pathname:'/bill',params:{kind:'electricity'}})}/>
+      <Note>Bill photos are previewed locally. Enter and confirm the values printed on your bill.</Note>
+    </Card>
+    <Note>Tariff classes and future bill amounts are not verified by this demo. Avoid treating estimates as live meter data.</Note>
   </Page>;
 }
