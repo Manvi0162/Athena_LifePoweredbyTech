@@ -7,6 +7,7 @@
   POST /household/scenarios     {category, reduction_percent} or {category, scenario, params}
   GET  /household/insights      Big Brain dashboard in the app's Insight shape
   GET  /household/dashboard     Big Brain dashboard exactly as in the Big Brain report (section 6)
+  GET  /big-brain/dashboard     Big Brain v3 (Manvi's latest notebook): savings compared per 30 days + summary
   POST /household/coach         AI coach answer
   GET  /activity                every module's events, newest first
   POST /demo/sample, /demo/reset
@@ -325,11 +326,26 @@ def dashboard(explain: bool = True):
     return build_dashboard(ctx, h, use_ai=explain)
 
 
+@router.get("/big-brain/dashboard")
+def big_brain_dashboard(explain: bool = True):
+    """Manvi's v3 endpoint (same path and JSON as her notebook), on this household's own data."""
+    from big_brain.v3 import big_brain_v3
+    ctx, h = require_household()
+    return big_brain_v3(ctx, h, use_ai=explain)
+
+
 @router.get("/household/insights")
 def insights(explain: bool = True):
     from big_brain.service import build_dashboard, insights_for_ui
+    from big_brain.v3 import big_brain_v3
     ctx, h = require_household()
-    return insights_for_ui(build_dashboard(ctx, h, use_ai=explain))
+    out = insights_for_ui(build_dashboard(ctx, h, use_ai=explain))
+    v3 = big_brain_v3(ctx, h, use_ai=explain)["dashboard"]
+    out["big_brain_summary"] = v3["summary"]                      # Manvi v3: one-paragraph plan for Home
+    out["savings_30d"] = [{k: r.get(k) for k in ("rank", "module", "action_id", "title", "normalized_savings_30d_mur",
+                                                 "estimated_savings_mur", "savings_period", "ai_explanation")}
+                          for r in v3["recommendations"]]
+    return out
 
 
 class CoachIn(BaseModel):

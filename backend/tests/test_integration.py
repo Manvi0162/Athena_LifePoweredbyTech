@@ -228,3 +228,24 @@ def test_sample_household(client):
     assert client.post("/demo/reset").status_code == 403
     assert client.post("/demo/reset", headers=step_up(client, "reset_account")).json()["ok"]
     assert client.get("/utilities/forecast", params={"category": "water"}).json()["value"] is None
+
+
+def test_big_brain_v3_from_manvi_notebook(client):
+    from big_brain import v3
+    a = v3.normalize_savings_period({"estimated_savings_mur": 60, "savings_period": "2026-10-01 to 2026-10-16",
+                                     "has_valid_savings": True})
+    assert a["normalized_savings_30d_mur"] == 120.0 and a["source_period_days"] == 15
+    assert v3.normalize_savings_period({"estimated_savings_mur": 50, "savings_period": "month",
+                                        "has_valid_savings": True})["normalized_savings_30d_mur"] == 50.0
+    assert v3.normalize_savings_period({"estimated_savings_mur": 5, "savings_period": "week",
+                                        "has_valid_savings": True})["normalization_status"] == "not_comparable"
+    client.post("/demo/sample")
+    d = client.get("/big-brain/dashboard", params={"explain": False}).json()
+    assert d["version"] == "3.0" and d["data_sources"]["water"] == "household_records"
+    recs = d["dashboard"]["recommendations"]
+    assert recs and [r["rank"] for r in recs] == list(range(1, len(recs) + 1))
+    assert all(recs[i]["normalized_savings_30d_mur"] >= recs[i + 1]["normalized_savings_30d_mur"]
+               for i in range(len(recs) - 1))
+    assert {r["module"] for r in recs} == {"water", "electricity"} and d["dashboard"]["summary"]
+    ins = client.get("/household/insights", params={"explain": False}).json()
+    assert ins["big_brain_summary"] == d["dashboard"]["summary"] and ins["savings_30d"]
