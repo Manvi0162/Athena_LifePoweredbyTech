@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 import { ReceiptItem, UtilityKind } from './types';
 
 export const DEMO_MODE = process.env.EXPO_PUBLIC_USE_MOCKS !== 'false';
@@ -57,7 +58,14 @@ export async function uploadImage<T>(path: string, imageUri: string): Promise<T>
   if (!URL) throw Error('Backend URL missing.');
   const data = new FormData();
   // The food backend reads the photo from the `image` field.
-  data.append('image', { uri: imageUri, name: 'receipt.jpg', type: 'image/jpeg' } as any);
+  if (Platform.OS === 'web') {
+    // In a browser the picker gives a blob:/data: URL; the {uri,name,type} object only works on iOS/Android
+    // (on web it was sent as the text "[object Object]" -> "Expected UploadFile, received str").
+    const blob = await (await fetch(imageUri)).blob();
+    data.append('image', blob, blob.type === 'image/png' ? 'receipt.png' : 'receipt.jpg');
+  } else {
+    data.append('image', { uri: imageUri, name: 'receipt.jpg', type: 'image/jpeg' } as any);
+  }
   const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), 45000);
   try {
     const headers: Record<string, string> = { Accept: 'application/json' };
