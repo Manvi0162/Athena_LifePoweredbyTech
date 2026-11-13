@@ -194,6 +194,7 @@ def combine_big_brain_actions(big_brain_actions, domain_recommendations):
                          "estimated_savings_mur": a["estimated_savings_mur"], "confidence": a["confidence"],
                          "evidence": a["evidence"], "assumptions": a["assumptions"],
                          "kind": a.get("kind", "action"), "status": a.get("status"),          # INTEGRATION
+                         "detail": a.get("detail"),
                          "explanation": a.get("explanation")})
     return combined
 

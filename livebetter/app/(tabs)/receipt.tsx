@@ -20,7 +20,8 @@ export default function Receipt(){const {demo,parseReceipt,confirmReceipt}=useAp
     if(demo){setMessage('Photo added. Automatic item extraction is unavailable; enter items manually.');return;}
     const parsed=await parseReceipt(uri);
     setItems(parsed.items||[]);setReceiptId(parsed.receipt_id);
-    setMessage('OCR suggestions: inspect and correct every item before saving.');
+    setMessage('OCR suggestions: inspect and correct every item before saving.'+
+      (parsed.excluded_non_food?.length?` Not food, left out: ${parsed.excluded_non_food.join(', ')}.`:''));
   }catch(e){Alert.alert('Photo/parse problem',String(e));setMessage('Image processing failed. You can still enter items manually.');}}
   const update=(i:number,patch:Partial<ReceiptItem>)=>setItems(old=>old.map((v,j)=>i===j?{...v,...patch}:v));
   async function save(){if(!items.length)return Alert.alert('No items','Add at least one grocery item.');

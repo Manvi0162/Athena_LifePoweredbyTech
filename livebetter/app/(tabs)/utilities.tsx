@@ -7,7 +7,7 @@ import {money,S,C} from '../../src/theme';
 import {ActionRow,Card,Label,Note,Page} from '../../src/ui';
 
 export default function Utilities(){
-  const {state,forecast}=useApp();
+  const {state,forecast,demo}=useApp();
   const [data,setData]=useState<Partial<Record<UtilityKind,Forecast>>>({});
   const [loading,setLoading]=useState(true);
 
@@ -36,7 +36,8 @@ export default function Utilities(){
             <Text style={[S.muted,{color:C.green,fontWeight:'700'}]}>VIEW DETAILS  ›</Text>
           </View>
           <Text style={[S.amount,{color:C.ink,fontSize:23}]}>{forecastData?.value==null?'No forecast yet':money(forecastData.value)}</Text>
-          <Note>{forecastData?`${forecastData.units} ${forecastData.unit} · ${forecastData.period_start} to ${forecastData.period_end}`:'Add a bill to start your baseline'}</Note>
+          <Note>{forecastData&&forecastData.value!=null?`${forecastData.units} ${forecastData.unit} · ${forecastData.period_start} to ${forecastData.period_end}`:
+            (forecastData?.status_message||'Add a bill to start your baseline')}</Note>
         </Pressable>;
       })}
     </Card>
@@ -49,6 +50,7 @@ export default function Utilities(){
         onPress={()=>router.push({pathname:'/bill',params:{kind:'electricity'}})}/>
       <Note>Bill photos are previewed locally. Enter and confirm the values printed on your bill.</Note>
     </Card>
-    <Note>Tariff classes and future bill amounts are not verified by this demo. Avoid treating estimates as live meter data.</Note>
+    <Note>{demo?'Tariff classes and future bill amounts are not verified by this demo. Avoid treating estimates as live meter data.':
+      'Costs are calculated with the official CWA and CEB tariffs. Estimates are not live meter data.'}</Note>
   </Page>;
 }
