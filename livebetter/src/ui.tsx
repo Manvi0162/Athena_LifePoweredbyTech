@@ -48,7 +48,7 @@ export function BottomNavigation(){
   const pathname=usePathname();
   const path=pathname.split('/').filter(Boolean).pop()||'home';
   const activeTab=path==='utilities'||path==='water'||path==='electricity'||path==='bill'||path==='habits'?'utilities'
-    :path==='pantry'||path==='receipt'||path==='pantry-updated'||path==='stock'||path==='ingredients'||path==='cook-now'||pathname.startsWith('/recipe/')?'pantry'
+    :path==='pantry'||path==='receipt'||path==='pantry-updated'||path==='stock'||path==='ingredients'||path==='cook-now'||path==='my-recipes'||pathname.startsWith('/recipe/')?'pantry'
     :path==='coach'?'coach':path==='activity'||pathname.startsWith('/activity')?'activity':'home';
   const tabs=[
     {name:'home',label:'Home',icon:'⌂'},

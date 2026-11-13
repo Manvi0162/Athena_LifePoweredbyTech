@@ -176,6 +176,33 @@ def _elec_effect(kwh_total, title, how, period_note):
     return out
 
 
+def _electric_water_heating():
+    """True / False / None (not answered) from electricity question 3."""
+    s, A, EF, T = _elec_ctx()
+    a = s.get("assessment") or {}
+    v = a.get("water_heating", a.get("E3"))
+    if v in (None, "", "not_sure"):
+        return None
+    return str(v).lower() == "electric"
+
+
+def _hot_water_electricity(litres, when):
+    """Showers use hot water: with an electric water heater, the change also moves the CEB bill (same physics as
+    the cross-module recommendation in big_brain/adapters.py)."""
+    from .adapters import DELTA_T, HEATER_EFFICIENCY, HOT_SHARE, KJ_PER_L_DEGC
+    electric = _electric_water_heating()
+    if electric is False:
+        return []
+    kwh = litres * HOT_SHARE * KJ_PER_L_DEGC * DELTA_T / 3600 / HEATER_EFFICIENCY
+    if electric is None:
+        return [{"module": "electricity", "title": "Water-heater electricity", "status": "needs_bill",
+                 "message": "If your water heater is electric, this also changes your electricity bill. Answer the "
+                            "electricity habit questions (water heating) to include it."}]
+    return [_elec_effect(kwh, "Water-heater electricity",
+                         f"{abs(litres):,.0f} L x {HOT_SHARE:g} hot x {KJ_PER_L_DEGC} kJ/L/degC x {DELTA_T:g} degC / 3600 / "
+                         f"{HEATER_EFFICIENCY:g}", when)]
+
+
 def _cycle_days():
     s, F, W = _water_ctx()
     try:
@@ -200,8 +227,9 @@ def calculate(change, members):
         flow = cat["shorter_showers"]["params"]["flow_l_per_min"]["default"]
         people = change.get("people") or 1
         litres = sign * change["minutes"] * flow * people * days
-        return [_water_effect(litres, f"Shower {change['minutes']:g} min {word}" + (f" ({people:g} people)" if people > 1 else ""),
-                              f"{change['minutes']:g} min x {flow} L/min x {people:g} person(s) x {days:g} day(s)", when)]
+        res = [_water_effect(litres, f"Shower {change['minutes']:g} min {word}" + (f" ({people:g} people)" if people > 1 else ""),
+                             f"{change['minutes']:g} min x {flow} L/min x {people:g} person(s) x {days:g} day(s)", when)]
+        return res + _hot_water_electricity(litres, when)
     if k == "laundry":
         per_load = cat["full_laundry_loads"]["params"]["litres_per_load"]["default"]
         loads = change["loads_per_week"] * (days / 7)
@@ -232,6 +260,15 @@ def calculate(change, members):
                 "before_rs": r["baseline"]["rs"], "after_rs": r["with_scenario"]["rs"], "delta_rs": r["difference"]["rs"],
                 "period_start": r["period_start"], "period_end": r["period_end"], "how": r["calculation"],
                 "when": f"for {change.get('days') or 7:g} days"}]
+        s2, A, EF, T = _elec_ctx()
+        f = EF.forecast(s2)
+        if f.get("status") == "ok":
+            per_person_day = f["kwh"]["mid"] / max(days_total, 1) / max(members, 1)
+            d = min(change.get("days") or 7, days_total)
+            res.append(_elec_effect(per_person_day * change["people"] * d, "Electricity for the extra people" if change["people"] > 0
+                                    else "Electricity while someone is away",
+                                    f"{f['kwh']['mid']:g} kWh / {days_total} days / {members:g} people x {change['people']:+g} x {d:g} days",
+                                    f"for {d:g} days"))
         return res
     if k == "standby":
         p = __import__("electricity.actions", fromlist=["CATALOGUE"]).CATALOGUE["standby_off"]["params"]
@@ -315,7 +352,99 @@ def answer(household, question):
     if len(ok) > 1:
         parts.append(f"Together: Rs {abs(budget['total_delta_rs']):,.2f} "
                      f"{'less' if budget['total_delta_rs'] <= 0 else 'more'} on your next bills.")
+    suggestion = _suggest(ok, budget)
+    if suggestion:
+        parts.append(suggestion)
     if ok:
         parts.append("This is an estimate with the official tariffs; your next bill shows the real change.")
     return {"answer": " ".join(parts), "intent": "what_if", "source": "template", "changes": results, "budget": budget,
+            "suggestion": suggestion, "can_apply": bool(ok), "apply_requested": wants_apply(question),
+            "plan": [{k: c.get(k) for k in ("kind", "minutes", "people", "loads_per_week", "taps", "flushes", "days",
+                                            "appliance", "hours", "pct", "module", "sign", "text")} for c in changes_in],
             "suggestions": SUGGESTIONS, "actions": []}
+
+
+APPLY_RE = re.compile(r"\b(apply|do it|go ahead|set it|start (it|now|this)|commit|make it a goal|add (it )?to my (plan|goals))\b")
+
+
+def wants_apply(question):
+    return bool(APPLY_RE.search(question.lower()))
+
+
+def _suggest(ok, budget):
+    """Rule-based advice shown with every answer (the user decides whether to apply it)."""
+    if not ok:
+        return None
+    total = budget["total_delta_rs"]
+    over = [b for b in budget["lines"] if not b["within_after"]]
+    back = [b for b in budget["lines"] if not b["within_before"] and b["within_after"]]
+    if total < 0:
+        msg = ("My suggestion: do it. " if total <= -20 else "My suggestion: small effect on the bill, worth it if it is easy. ")
+        msg += f"It saves about Rs {abs(total):,.2f} on your next bills."
+        if back:
+            msg += f" It brings your {back[0]['module']} bill back within budget."
+        elif over:
+            msg += f" Your {over[0]['module']} bill is still over budget, so combine it with another change."
+        return msg + " Tap Apply to add it to your plan."
+    if total > 0:
+        msg = f"My suggestion: plan for about Rs {total:,.2f} more on your next bills."
+        if over:
+            msg += f" That takes your {over[0]['module']} bill over budget."
+        return msg
+    return "My suggestion: this does not change your bills, so do it only if it helps in other ways."
+
+
+def apply_plan(ctx, household, question):
+    """Apply = record the change as the household's plan (household_actions + activity), and also save it as a goal in
+    the water / electricity module when that module supports it (so completing it later lowers the forecast)."""
+    result = answer(household, question)
+    ok = [c for c in result["changes"] if c["status"] == "ok"]
+    if not ok:
+        return {**result, "applied": False, "applied_message": "Nothing to apply: add bills first."}
+    saved_goals = []
+    for c in result["plan"]:
+        try:
+            if c["kind"] == "shower" and c.get("sign", -1) < 0:
+                from water import api as wapi
+                wapi.save_goal(wapi.ScenarioIn(scenario="shorter_showers", params={"minutes_less": c["minutes"]}))
+                saved_goals.append("water: shorter showers")
+            elif c["kind"] == "laundry" and c.get("sign", -1) < 0:
+                from water import api as wapi
+                wapi.save_goal(wapi.ScenarioIn(scenario="full_laundry_loads", params={"loads_less_per_week": c["loads_per_week"]}))
+                saved_goals.append("water: fewer laundry loads")
+            elif c["kind"] == "tap":
+                from water import api as wapi
+                wapi.save_goal(wapi.ScenarioIn(scenario="fix_dripping_tap", params={"taps": c.get("taps") or 1}))
+                saved_goals.append("water: fix dripping tap")
+            elif c["kind"] == "standby":
+                from electricity import api as eapi
+                eapi.select_action(eapi.ActionIn(action="standby_off", params={}))
+                saved_goals.append("electricity: standby off")
+            elif c["kind"] == "appliance" and c.get("sign", -1) < 0:
+                from electricity import api as eapi
+                eapi.select_action(eapi.ActionIn(action="appliance_hours",
+                                                 params={"appliance": c["appliance"], "hours_less_per_day": c["hours"]}))
+                saved_goals.append(f"electricity: {c['appliance'].replace('_', ' ')} less")
+        except Exception as exc:                      # module refused (e.g. needs a habit answer): the plan is still kept
+            log.info("Goal not saved in module: %s", exc)
+    total = round(sum(c["delta_rs"] for c in ok), 2)
+    ctx.db.table("household_actions").insert({"household_id": household["id"], "action_type": "coach:plan",
+                                              "assumptions": {"question": question[:300], "total_delta_rs": total,
+                                                              "changes": [{k: c.get(k) for k in ("module", "title", "delta_rs", "when")}
+                                                                          for c in ok]},
+                                              "status": "selected"}).execute()
+    ctx.db.table("activity_logs").insert({"household_id": household["id"], "event_type": "ai.plan_applied",
+                                          "details": {"module": "ai", "question": question[:200], "total_delta_rs": total,
+                                                      "goals": saved_goals}}).execute()
+    msg = (f"Applied. Added to your plan: {', '.join(c['title'] for c in ok)} (about Rs {abs(total):,.2f} "
+           f"{'less' if total <= 0 else 'more'} on your next bills).")
+    if saved_goals:
+        msg += " Also saved as goals in " + ", ".join(saved_goals) + "."
+    return {**result, "applied": True, "applied_message": msg, "goals": saved_goals}
+
+
+def list_plans(ctx, household):
+    rows = (ctx.db.table("household_actions").select("*").eq("household_id", household["id"])
+            .eq("action_type", "coach:plan").execute().data or [])
+    return [{"id": r["id"], "status": r.get("status"), "created_at": r.get("created_at"),
+             **(r.get("assumptions") or {})} for r in rows]

@@ -6,19 +6,20 @@ import {ActivityIndicator,Keyboard,KeyboardAvoidingView,Platform,Pressable,Scrol
 import {router} from 'expo-router';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useApp} from '../../src/context';
-import {CoachReply,WhatIfChange} from '../../src/types';
+import {CoachReply,Plan,WhatIfChange} from '../../src/types';
 import {C,money,S} from '../../src/theme';
 import {BottomNavigation} from '../../src/ui';
 
-type Msg={role:'user'|'coach';text:string;reply?:CoachReply};
-const STARTERS=['What if I shower 2 minutes less every day?','What if we use the AC 1 hour less a day?',
-  'What if I run 1 laundry load less a week?','What if 2 guests stay for 5 days?',
-  'What if I switch off standby at the plug?','What if we use 10% less electricity?'];
+type Msg={role:'user'|'coach';text:string;reply?:CoachReply;question?:string};
 const WIDTH={width:'100%' as const,maxWidth:440,alignSelf:'center' as const};
 
 export default function Coach(){
-  const {ask,demo}=useApp();
+  const {ask,demo,applyPlan,plans}=useApp();
   const [msgs,setMsgs]=useState<Msg[]>([]);
+  const [myPlan,setMyPlan]=useState<Plan[]>([]);
+  const [showPlan,setShowPlan]=useState(false);
+  const loadPlans=()=>{if(!demo)plans().then(setMyPlan).catch(()=>undefined);};
+  useEffect(loadPlans,[demo]);
   const [draft,setDraft]=useState('');
   const [sending,setSending]=useState(false);
   const [kb,setKb]=useState(false);
@@ -30,13 +31,24 @@ export default function Coach(){
   },[]);
   useEffect(()=>{setTimeout(()=>scroll.current?.scrollToEnd({animated:true}),80);},[msgs,sending]);
 
+  async function apply(i:number){
+    const m=msgs[i];if(!m?.question||sending)return;
+    setSending(true);
+    try{const r=await applyPlan(m.question);
+      setMsgs(all=>all.map((x,j)=>j===i?{...x,reply:{...x.reply!,applied:r.applied,applied_message:r.applied_message}}:x));
+      loadPlans();}
+    catch(e){setMsgs(all=>[...all,{role:'coach',text:e instanceof Error?e.message:String(e)}]);}
+    finally{setSending(false);}
+  }
+
   async function send(q=draft){
     const text=q.trim();if(!text||sending)return;
     setDraft('');setSending(true);setMsgs(m=>[...m,{role:'user',text}]);
     try{
       if(demo)throw Error('What-if answers are calculated by the backend. Run the app in live mode.');
       const reply=await ask(text);
-      setMsgs(m=>[...m,{role:'coach',text:reply.answer,reply}]);
+      setMsgs(m=>[...m,{role:'coach',text:reply.answer,reply,question:text}]);
+      if(reply.applied)loadPlans();
     }catch(e){setMsgs(m=>[...m,{role:'coach',text:e instanceof Error?e.message:String(e)}]);}
     finally{setSending(false);}
   }
@@ -58,31 +70,28 @@ export default function Coach(){
 
       <ScrollView ref={scroll} style={{flex:1}} contentContainerStyle={[WIDTH,{paddingHorizontal:18,paddingBottom:16,gap:12}]}
         keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
+        {myPlan.length?<Pressable accessibilityRole="button" onPress={()=>setShowPlan(v=>!v)}
+          style={{backgroundColor:C.softGreen,borderRadius:16,padding:13,gap:6}}>
+          <View style={S.between}><Text style={S.title}>Your plan · {myPlan.length} change{myPlan.length>1?'s':''}</Text>
+            <Text style={{color:C.green,fontWeight:'800'}}>{money(Math.abs(myPlan.reduce((t,p)=>t+(p.total_delta_rs||0),0)))} {showPlan?'▴':'▾'}</Text></View>
+          {showPlan?myPlan.map(p=><View key={p.id} style={{borderTopWidth:1,borderTopColor:'#CDEBE2',paddingTop:6,gap:2}}>
+            <Text style={S.body}>{p.question}</Text>
+            <Text style={S.muted}>{p.changes.map(c=>`${c.title} (${c.delta_rs<0?'−':'+'}${money(Math.abs(c.delta_rs))})`).join(' · ')}</Text>
+          </View>):<Text style={S.muted}>Changes you applied. Tap to see them.</Text>}
+        </Pressable>:null}
         {!msgs.length?<View style={{gap:12,paddingTop:6}}>
           <View style={{backgroundColor:C.navy,borderRadius:20,padding:18,gap:8}}>
             <Text style={S.heroEyebrow}>AI COACH · WHAT-IF</Text>
             <Text style={{color:C.white,fontSize:18,fontWeight:'800',lineHeight:24}}>Ask about one change in your home. I recalculate your next water and electricity bills.</Text>
-            <Text style={S.heroFootnote}>Official CWA and CEB tariffs, your own bills, compared with your budget.</Text>
+            <Text style={S.heroFootnote}>Official CWA and CEB tariffs, your own bills, compared with your budget. Say "apply it" to add a change to your plan straight away.</Text>
           </View>
-          <Text style={[S.muted,{fontWeight:'800',letterSpacing:0.6}]}>TRY ONE</Text>
-          {STARTERS.map(q=><Pressable key={q} accessibilityRole="button" onPress={()=>void send(q)}
-            style={{flexDirection:'row',alignItems:'center',gap:10,backgroundColor:C.white,borderWidth:1,borderColor:C.line,
-              borderRadius:14,paddingVertical:12,paddingHorizontal:14}}>
-            <Text style={{color:C.green,fontWeight:'900'}}>?</Text><Text style={[S.body,{flex:1}]}>{q}</Text>
-            <Text style={{color:C.muted}}>›</Text></Pressable>)}
         </View>:msgs.map((m,i)=>m.role==='user'?
           <View key={i} style={{alignSelf:'flex-end',maxWidth:'85%',backgroundColor:C.green,borderRadius:18,borderBottomRightRadius:5,
             paddingHorizontal:14,paddingVertical:10}}><Text style={{color:C.white,fontSize:14,lineHeight:20}}>{m.text}</Text></View>:
-          <CoachAnswer key={i} msg={m}/>)}
+          <CoachAnswer key={i} msg={m} onApply={()=>void apply(i)} busy={sending}/>)}
         {sending?<View style={[S.row,{alignSelf:'flex-start',backgroundColor:C.white,borderRadius:16,padding:12}]}>
           <ActivityIndicator color={C.green}/><Text style={S.muted}>Recalculating your bills…</Text></View>:null}
       </ScrollView>
-
-      {msgs.length?<View style={WIDTH}><ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled"
-        style={{flexGrow:0}} contentContainerStyle={[{gap:8,paddingHorizontal:18,paddingBottom:8}]}>
-        {STARTERS.map(q=><Pressable key={q} accessibilityRole="button" disabled={sending} onPress={()=>void send(q)}
-          style={[S.choice,{paddingVertical:8}]}><Text style={S.choiceText}>{q.replace('What if ','').replace('?','')}</Text></Pressable>)}
-      </ScrollView></View>:null}
 
       <View style={{backgroundColor:C.white,borderTopWidth:1,borderTopColor:C.line}}>
         <View style={[WIDTH,{flexDirection:'row',alignItems:'flex-end',gap:8,paddingHorizontal:14,paddingVertical:10}]}>
@@ -99,7 +108,7 @@ export default function Coach(){
   </SafeAreaView>;
 }
 
-function CoachAnswer({msg}:{msg:Msg}){
+function CoachAnswer({msg,onApply,busy}:{msg:Msg;onApply:()=>void;busy:boolean}){
   const r=msg.reply;
   const ok=(r?.changes||[]).filter(c=>c.status==='ok');
   if(!r||r.intent!=='what_if'||!r.changes?.length)return <View style={{alignSelf:'flex-start',maxWidth:'92%',backgroundColor:C.white,
@@ -122,6 +131,13 @@ function CoachAnswer({msg}:{msg:Msg}){
           (b.within_after?' · this change brings you back within budget':' · this change takes you over budget'):''}</Text>
       </View>;
     })}
+    {r.suggestion?<View style={{backgroundColor:C.softAmber,borderRadius:12,padding:11,gap:3}}>
+      <Text style={[S.title,{fontSize:13}]}>✦ Suggestion</Text><Text style={S.body}>{r.suggestion.replace(/^My suggestion: /,'')}</Text></View>:null}
+    {r.applied?<View style={{backgroundColor:C.softGreen,borderRadius:12,padding:11}}>
+      <Text style={[S.body,{color:C.green,fontWeight:'700'}]}>✓ {r.applied_message}</Text></View>:
+      r.can_apply?<Pressable accessibilityRole="button" disabled={busy} onPress={onApply}
+        style={{backgroundColor:C.green,borderRadius:12,paddingVertical:11,alignItems:'center',opacity:busy?0.5:1}}>
+        <Text style={{color:C.white,fontWeight:'800'}}>Apply to my plan</Text></Pressable>:null}
     {!r.budget?.lines?.length&&ok.length?<Text style={S.muted}>Set a water or electricity budget in your household details to see the effect on it.</Text>:null}
     <Text style={[S.muted,{fontSize:11}]}>{r.source==='gemini'?'Worded by AI · numbers ':'Numbers '}calculated with the official CWA and CEB tariffs from your bills. Estimates, not measured savings.</Text>
   </View>;

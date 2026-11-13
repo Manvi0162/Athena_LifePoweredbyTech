@@ -47,6 +47,8 @@ export default function Pantry(){
         <Note>{recipe.ai_generated?'AI-generated · ':''}{Math.round(recipe.coverage*100)}% in your pantry{recipe.missing.length?` · missing ${recipe.missing.slice(0,3).join(', ')}`:' · ready to cook'}</Note>
       </Pressable>)}
       {list&&!list.length?<Note>No recipes yet. Scan a receipt or an ingredient to get suggestions.</Note>:null}
+      <Pressable accessibilityRole="button" onPress={()=>router.push('/my-recipes')} style={{paddingTop:10,borderTopWidth:1,borderTopColor:C.line}}>
+        <Text style={{color:C.green,fontWeight:'800'}}>📖 View my recipes and all recipes  ›</Text></Pressable>
     </Card>
   </Page>;
 }

@@ -1,6 +1,7 @@
 import React,{createContext,useCallback,useContext,useEffect,useMemo,useState} from 'react';
 import {ApiError,DEMO_MODE,ParsedReceipt,categoryParams,clearSession,getSession,loadSession,newOperationId,request,routes,saveSession,uploadImage} from './api';
 import {getRecipes,loadDemo,mockForecast,mockInsights,mockScenario,putBill,putCooking,putHousehold,putPantry,putReceipt,resetDemo,saveDemo} from './mock';
+import {Plan} from './types';
 import {AIRecipe,Explanation,Habits,ParsedBill,RecipeMatch,RecognisedItem} from './types';
 import {Activity,AuthenticatorSetup,Bill,CoachReply,Forecast,Household,Insight,LoginResult,PantryItem,ReceiptItem,Recipe,ResetStatus,Scenario,SecurityStatus,SensitiveAction,Snapshot,UtilityKind} from './types';
 
@@ -32,6 +33,8 @@ type Context={
   searchRecipes:(ingredients:string[])=>Promise<RecipeMatch[]>;
   generateRecipe:(ingredients:string[])=>Promise<AIRecipe>;
   saveRecipe:(recipe:AIRecipe['recipe'])=>Promise<string>;
+  applyPlan:(question:string)=>Promise<CoachReply>;
+  plans:()=>Promise<Plan[]>;
   addBill:(v:Omit<Bill,'id'|'household_id'|'currency'>)=>Promise<void>;
   addItem:(v:Omit<PantryItem,'id'> & {id?:string})=>Promise<void>;
   confirmReceipt:(items:ReceiptItem[],receiptId?:string)=>Promise<void>;
@@ -258,6 +261,9 @@ export function AppProvider({children}:{children:React.ReactNode}){
   const searchRecipes=async(ingredients:string[])=>{live();
     return (await request<{matches:RecipeMatch[]}>(routes.searchRecipes,'POST',{ingredients})).matches;};
   const generateRecipe=async(ingredients:string[])=>{live();return request<AIRecipe>(routes.generateRecipe,'POST',{ingredients});};
+  const applyPlan=async(question:string)=>{live();
+    const r=await request<CoachReply>('/household/coach/apply','POST',{question});loadLive().catch(()=>undefined);return r;};
+  const plans=useCallback(async()=>{live();return request<Plan[]>('/household/plans');},[]);
   const saveRecipe=async(recipe:AIRecipe['recipe'])=>{live();let id='';
     await execute(async()=>{id=(await request<{recipe_id:string}>(routes.drafts,'POST',{recipe})).recipe_id;});
     return id;};
@@ -265,7 +271,7 @@ export function AppProvider({children}:{children:React.ReactNode}){
     login,loginCode,signup,logout,loadSample,refreshAll,onboard,deleteBill,addBill,addItem,confirmReceipt,parseReceipt,forecast,
     insights,recipes,cook,scenario,ask,refreshPantry,securityStatus,setPattern,verifyPattern,authenticatorSetup,
     authenticatorConfirm,authenticatorDisable,resetAccount,restoreAccount,resetStatus,parseBill,explain,habits,saveHabits,
-    recognizeFood,describeFood,searchRecipes,generateRecipe,saveRecipe}),
+    recognizeFood,describeFood,searchRecipes,generateRecipe,saveRecipe,applyPlan,plans}),
     // Event handlers bind the latest state each render.
     [ready,busy,state,error,signedIn]);
   // Screens mount only after the saved login is loaded, so their first requests carry the token.

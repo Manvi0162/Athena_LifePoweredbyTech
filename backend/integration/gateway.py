@@ -321,6 +321,25 @@ def household_scenarios(body: UIScenario):
 
 
 # ---------------- Big Brain ----------------
+class ApplyIn(BaseModel):
+    question: str = Field(min_length=1, max_length=500)
+
+
+@router.post("/household/coach/apply")
+def coach_apply(body: ApplyIn):
+    """The Apply button under a what-if answer: recalculated on the server (client numbers are not trusted)."""
+    from big_brain import whatif
+    ctx, h = require_household()
+    return whatif.apply_plan(ctx, h, body.question)
+
+
+@router.get("/household/plans")
+def household_plans():
+    from big_brain import whatif
+    ctx, h = require_household()
+    return whatif.list_plans(ctx, h)
+
+
 @router.get("/household/dashboard")
 def dashboard(explain: bool = True):
     from big_brain.service import build_dashboard
@@ -362,7 +381,11 @@ def coach(body: CoachIn):
     from big_brain import coach as C
     from big_brain import whatif
     ctx, h = require_household()
-    result = C.rephrase(whatif.answer(h, body.message), body.language)
+    if whatif.wants_apply(body.message):                 # "apply it", "do it": rule-based, applied straight away
+        result = whatif.apply_plan(ctx, h, body.message)
+    else:
+        result = whatif.answer(h, body.message)
+    result = C.rephrase(result, body.language)
     ctx.db.table("activity_logs").insert({"household_id": h["id"], "event_type": "coach.question",
                                           "details": {"module": "big_brain", "intent": result["intent"], "question": body.message[:200],
                                                       "source": result["source"]}}).execute()
@@ -404,6 +427,7 @@ def _security_label(ev, d):
 
 
 LABELS = {
+    "ai.plan_applied": lambda d: f"Plan applied from the AI coach: {d.get('question')}",
     "receipt_confirmed": lambda d: f"Confirmed grocery purchase (Rs {d.get('total', 0):,.2f})" if d.get("total") is not None
     else "Confirmed grocery purchase",
     "recipe_cooked": lambda d: f"Cooked {d.get('recipe_name', 'a recipe')}; pantry stock reduced (no new expense)",

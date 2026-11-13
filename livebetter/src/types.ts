@@ -46,7 +46,8 @@ export type WhatIfChange = { module: UtilityKind; title: string; status: 'ok' | 
 export type WhatIfBudget = { lines: { module: UtilityKind; budget_rs: number; before_rs: number; after_rs: number;
   within_before: boolean; within_after: boolean }[]; monthly_target_rs?: number | null; total_delta_rs: number };
 export type CoachReply = { answer: string; intent: string; source: string; suggestions?: string[];
-  changes?: WhatIfChange[]; budget?: WhatIfBudget | null;
+  changes?: WhatIfChange[]; budget?: WhatIfBudget | null; suggestion?: string | null; can_apply?: boolean;
+  applied?: boolean; applied_message?: string;
   actions?: { module: string; action_id: string; title: string; estimated_savings_mur: number | null }[] };
 export type Snapshot = { household: Household | null; bills: Bill[]; pantry: PantryItem[];
   receipts: { id: string; at: string; total: number }[];
@@ -80,3 +81,5 @@ export type RecipeMatch = { recipe_id: string; name: string; verification_status
 export type AIRecipe = { recipe: { name: string; description?: string; servings?: number; prep_minutes?: number;
   cook_minutes?: number; ingredients: { ingredient_name: string; quantity: number | null; unit: string | null; optional?: boolean }[];
   instructions: string[] }; missing: string[]; coverage: number; cook_now: boolean; warning: string };
+export type Plan = { id: string; status: string; created_at?: string; question: string; total_delta_rs: number;
+  changes: { module: UtilityKind; title: string; delta_rs: number; when: string }[] };

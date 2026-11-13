@@ -12,6 +12,7 @@ import {Btn,Card,Field,Label,Note,Page,readError} from '../../src/ui';
 
 export default function CookNow(){
   const app=useApp();
+  const [cooking,setCooking]=useState(false);
   const [photo,setPhoto]=useState<string|null>(null);
   const [items,setItems]=useState<RecognisedItem[]>([]);
   const [name,setName]=useState('');
@@ -47,8 +48,22 @@ export default function CookNow(){
     if(!name.trim())return setMsg({text:'Scan or type the ingredient first.',bad:true});
     resetAfter();setStep('Searching all recipes…');
     try{setMatches(await app.searchRecipes([name.trim()]));}
-    catch(e){setMsg({text:readError(e),bad:true});}
+    catch(e){setMsg({text:readError(e),bad:true});setStep(null);return;}
+    // Database recipes AND an AI-generated one, side by side (AI needs GEMINI_API_KEY on the backend).
+    setStep('AI is writing a recipe with it…');
+    try{setAi(await app.generateRecipe([name.trim()]));}catch{setAi(null);}
     finally{setStep(null);}
+  }
+  async function cookAi(){
+    if(!ai)return;
+    setCooking(true);
+    try{
+      const id=savedId||await app.saveRecipe(ai.recipe);
+      setSavedId(id);
+      await app.cook(id,'new');
+      router.replace('/pantry-updated');
+    }catch(e){setMsg({text:readError(e),bad:true});}
+    finally{setCooking(false);}
   }
   async function create(){
     setAi(null);setSavedId(null);setStep('AI is writing a recipe…');setMsg(null);
@@ -65,6 +80,7 @@ export default function CookNow(){
   const open=(id:string)=>router.push({pathname:'/recipe/[id]',params:{id}});
 
   return <Page back title="Cook with something now" subtitle="Scan the ingredient you want to use. We find a recipe for it.">
+    <Btn title="📖 View my recipes" outline onPress={()=>router.push('/my-recipes')}/>
     <Card>
       <Label>1 · Scan the ingredient</Label>
       <View style={S.row}>
@@ -87,17 +103,18 @@ export default function CookNow(){
     {msg?<Text style={msg.bad?S.error:[S.card,{color:C.green,fontWeight:'700'}]}>{msg.text}</Text>:null}
 
     {matches?<Card>
-      <Label>Recipes in our database that use {name.trim()}</Label>
+      <Label>From our recipe database</Label>
       {matches.length?matches.map(m=><Pressable key={m.recipe_id} accessibilityRole="button" onPress={()=>open(m.recipe_id)}
         style={{paddingVertical:10,borderTopWidth:1,borderTopColor:C.line,gap:2}}>
         <View style={S.between}><Text style={[S.title,{flex:1}]}>{m.name}</Text><Text style={{color:C.green,fontSize:19}}>›</Text></View>
         <Note>{m.verification_status==='pending'?'AI-generated · ':''}{m.already_in_pantry.length?`You have: ${m.already_in_pantry.join(', ')}. `:''}
           {m.still_to_buy.length?`Not in your pantry: ${m.still_to_buy.join(', ')}.`:'Everything else is in your pantry.'}</Note>
       </Pressable>):<Note>No recipe in the database uses it yet.</Note>}
-      <Btn title={matches.length?'Or create a new recipe with AI':'Create a recipe with AI'} outline={matches.length>0} onPress={()=>void create()}/>
+      {!ai?<Btn title="Create a recipe with AI" outline onPress={()=>void create()}/>:null}
     </Card>:null}
 
     {ai?<Card>
+      <Label>AI-generated for you</Label>
       <View style={{backgroundColor:C.amber,borderRadius:12,padding:11,gap:3}}>
         <Text style={[S.title,{color:'#8A5A00'}]}>⚠ AI-generated recipe</Text>
         <Text style={[S.muted,{color:'#8A5A00'}]}>{ai.warning}</Text>
@@ -112,10 +129,11 @@ export default function CookNow(){
       {ai.missing.length?<Note>Not in your pantry: {ai.missing.join(', ')}</Note>:null}
       <Text style={S.title}>Steps</Text>
       {ai.recipe.instructions.map((t,k)=><Text key={k} style={S.body}>{k+1}. {t}</Text>)}
-      {savedId?<Btn title="Cook this recipe  →" onPress={()=>open(savedId)}/>:<>
-        <Btn title="Save to my recipes" onPress={()=>void save()}/>
-        <Btn title="Try another recipe" outline onPress={()=>void create()}/>
-      </>}
+      <Btn title={cooking?'Updating your pantry…':'Use this recipe · I cooked it ✓'} disabled={cooking} onPress={()=>void cookAi()}/>
+      <Note>Cooking it lowers the ingredients in your pantry list. It never adds a grocery expense.</Note>
+      {savedId?<Text style={[S.muted,{color:C.green,fontWeight:'700'}]}>✓ Saved in My recipes</Text>:
+        <Btn title="Save to my recipes" outline onPress={()=>void save()}/>}
+      <Btn title="Try another AI recipe" outline onPress={()=>void create()}/>
     </Card>:null}
   </Page>;
 }
