@@ -36,7 +36,7 @@ export default function BillEntry(){const {addBill}=useApp();const params=useLoc
       <Btn title="Open camera" outline onPress={()=>take(true)}/>
       <Btn title="Choose from gallery" outline onPress={()=>take(false)}/>
       {photo?<Image source={{uri:photo}} style={{height:180,borderRadius:12}} resizeMode="contain"/>:null}
-      <Note>Photo preview is local only in this starter. Bill fields are entered manually; no OCR is claimed. Confirm values against the actual bill before saving.</Note>
+      <Note>Photo preview stays on this device. Bill fields are entered manually; no OCR is claimed. Confirm values against the actual bill before saving.</Note>
       <Btn title="Save confirmed bill" onPress={save}/>
     </Card>
   </Page>;

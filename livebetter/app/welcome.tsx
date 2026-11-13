@@ -2,10 +2,10 @@ import React from 'react';
 import {Text,View} from 'react-native';
 import {router} from 'expo-router';
 import {C,S} from '../src/theme';
-import {Btn,Card,Note,Page} from '../src/ui';
+import {Btn,Card,Page} from '../src/ui';
 
 export default function Welcome(){
-  return <Page title="Smarter home. Less waste. Better living."
+  return <Page back={false} showTabs={false} title="Smarter home. Less waste. Better living."
     subtitle="See what is coming, use what you have, and make every rupee count.">
     <View style={S.heroCard}>
       <Text style={{fontSize:12,fontWeight:'800',letterSpacing:1,color:'#BCEFE2'}}>LIVEBETTER ✦</Text>
@@ -20,9 +20,8 @@ export default function Welcome(){
       </View>
     </View>
     <Card>
-      <Btn title="Get started  →" onPress={()=>router.push('/login')}/>
-      <Btn title="Explore demo household" outline onPress={()=>router.push('/onboarding')}/>
-      <Note>Demo values are examples. No account is created in this preview.</Note>
+      <Btn title="Log in" onPress={()=>router.push('/login')}/>
+      <Btn title="Register" outline onPress={()=>router.push('/register')}/>
     </Card>
   </Page>;
 }

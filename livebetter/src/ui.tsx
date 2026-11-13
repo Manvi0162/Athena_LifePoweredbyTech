@@ -1,30 +1,68 @@
-import React from 'react';
-import {ActivityIndicator,KeyboardTypeOptions,Pressable,ScrollView,Text,TextInput,View} from 'react-native';
-import {router} from 'expo-router';
+import React,{useEffect,useState} from 'react';
+import {ActivityIndicator,Keyboard,KeyboardAvoidingView,KeyboardTypeOptions,Platform,Pressable,ScrollView,Text,TextInput,View} from 'react-native';
+import {router,usePathname} from 'expo-router';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {C,S} from './theme';
 import {useApp} from './context';
-export function Page({title,subtitle,children,back,showSettings,stickyFooter}:{title:string;subtitle?:string;children:React.ReactNode;back?:boolean;showSettings?:boolean;stickyFooter?:React.ReactNode}){
-  const {demo,error,clearError}=useApp();
-  return <SafeAreaView style={S.screen} edges={['top']}>
-    <ScrollView style={S.screen} contentContainerStyle={S.content} keyboardShouldPersistTaps="handled">
+export function Page({title,subtitle,children,back=true,showSettings,stickyFooter,showTabs=true}:{title:string;subtitle?:string;children:React.ReactNode;back?:boolean;showSettings?:boolean;stickyFooter?:React.ReactNode;showTabs?:boolean}){
+  const {error,clearError}=useApp();
+  const [keyboardVisible,setKeyboardVisible]=useState(false);
+  useEffect(()=>{
+    const show=Keyboard.addListener('keyboardDidShow',()=>setKeyboardVisible(true));
+    const hide=Keyboard.addListener('keyboardDidHide',()=>setKeyboardVisible(false));
+    return()=>{show.remove();hide.remove();};
+  },[]);
+  return <SafeAreaView style={S.screen} edges={['top','bottom']}>
+    <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==='ios'?'padding':'height'}>
+    <ScrollView style={S.screen} contentContainerStyle={S.content} keyboardShouldPersistTaps="handled"
+      keyboardDismissMode={Platform.OS==='ios'?'interactive':'on-drag'} automaticallyAdjustKeyboardInsets>
       <View style={S.screenHeader}>
         <View style={S.brandRow}>
           {back?<Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={()=>router.canGoBack()?router.back():router.replace('/(tabs)/home')} style={S.topAction}><Text style={S.topActionText}>‹</Text></Pressable>:null}
-          <View style={S.brandMark}><Text style={S.brandInitial}>LB</Text></View>
+          <View accessibilityLabel="LiveBetter L plus logo" style={S.brandMark}>
+            <Text style={S.brandInitial}>L</Text>
+            <Text style={S.brandPlus}>+</Text>
+          </View>
           <View><Text style={S.brandName}>LIVEBETTER</Text><Text style={S.brandCaption}>HOUSEHOLD PLANNER</Text></View>
         </View>
         {showSettings?<Pressable accessibilityRole="button" accessibilityLabel="Open settings" onPress={()=>router.push('/settings')} style={S.topAction}><Text style={S.topActionText}>⚙</Text></Pressable>:null}
       </View>
       <Text style={S.h1}>{title}</Text>{subtitle?<Text style={S.muted}>{subtitle}</Text>:null}
-      <View style={[S.tag,{backgroundColor:demo?C.amber:C.mint}]}><Text style={[S.tagText,{color:demo?'#875500':C.green}]}>{demo?'DEMO MODE · fictional local data':'LIVE API MODE'}</Text></View>
       {error?<Pressable onPress={clearError}><Text style={S.error}>{error}  · Tap to dismiss</Text></Pressable>:null}
       {children}
     </ScrollView>
     {stickyFooter?<View style={{backgroundColor:C.white,borderTopWidth:1,borderTopColor:C.line,paddingHorizontal:18,paddingTop:10,paddingBottom:8}}>
       {stickyFooter}
     </View>:null}
+    {showTabs&&!keyboardVisible?<BottomNavigation/>:null}
+    </KeyboardAvoidingView>
   </SafeAreaView>;
+}
+function BottomNavigation(){
+  const pathname=usePathname();
+  const path=pathname.split('/').filter(Boolean).pop()||'home';
+  const activeTab=path==='utilities'||path==='water'||path==='electricity'||path==='bill'?'utilities'
+    :path==='pantry'||path==='receipt'||path==='pantry-updated'||pathname.startsWith('/recipe/')?'pantry'
+    :path==='coach'?'coach':'home';
+  const tabs=[
+    {name:'home',label:'Home',icon:'⌂'},
+    {name:'utilities',label:'Utilities',icon:'◉'},
+    {name:'pantry',label:'Pantry',icon:'▤'},
+    {name:'coach',label:'Coach',icon:'✦'},
+  ] as const;
+  return <View accessibilityRole="tablist" style={S.bottomNavigation}>
+    {tabs.map(tab=>{
+      const focused=activeTab===tab.name;
+      return <Pressable key={tab.name} accessibilityRole="tab" accessibilityState={{selected:focused}}
+        accessibilityLabel={`${tab.label} tab`} onPress={()=>router.replace(`/(tabs)/${tab.name}`)}
+        style={S.bottomNavigationItem}>
+        <View style={[S.tabIcon,focused&&{backgroundColor:C.mint}]}>
+          <Text style={[S.tabIconText,{color:focused?C.green:C.muted}]}>{tab.icon}</Text>
+        </View>
+        <Text style={{fontSize:10,fontWeight:'700',color:focused?C.green:C.muted}}>{tab.label}</Text>
+      </Pressable>;
+    })}
+  </View>;
 }
 export function Card({children}:{children:React.ReactNode}){return <View style={S.card}>{children}</View>;}
 export function Label({children}:{children:React.ReactNode}){return <Text style={S.title}>{children}</Text>;}
@@ -58,7 +96,8 @@ export function Field({label,value,onChangeText,placeholder,keyboardType,multili
   placeholder?:string;keyboardType?:KeyboardTypeOptions;multiline?:boolean;secureTextEntry?:boolean}){
   return <View style={{gap:3}}><Text style={[S.muted,{fontWeight:'700'}]}>{label}</Text><TextInput
     style={[S.field,multiline&&{minHeight:78,textAlignVertical:'top'}]} value={value} onChangeText={onChangeText}
-    placeholder={placeholder} placeholderTextColor="#9AA9A4" keyboardType={keyboardType} multiline={multiline} secureTextEntry={secureTextEntry} autoCapitalize="sentences"/>
+    placeholder={placeholder} placeholderTextColor="#9AA9A4" keyboardType={keyboardType} multiline={multiline} secureTextEntry={secureTextEntry}
+    autoCapitalize={secureTextEntry||keyboardType==='email-address'?'none':'sentences'}/>
   </View>;
 }
 export function Loading(){return <View style={{padding:24}}><ActivityIndicator color={C.green}/><Text style={[S.muted,{textAlign:'center',marginTop:8}]}>Loading…</Text></View>;}

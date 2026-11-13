@@ -111,7 +111,6 @@ export default function Pantry(){
         </View>
         <Note>{Math.round(recipe.coverage*100)}% available · {recipe.missing.length?`Missing ${recipe.missing.join(', ')}`:'Ready to cook'}</Note>
       </Pressable>):<Note>No matching recipes. Try another search or add more pantry ingredients.</Note>}
-      {demo?<Note>Recipe samples are illustrative demo data, not a licensed recipe dataset.</Note>:null}
     </Card>
 
     <Card>

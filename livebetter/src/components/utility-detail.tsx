@@ -35,7 +35,7 @@ export function UtilityDetail({kind}:{kind:UtilityKind}){
   return <Page back title={isWater?'Water intelligence':'Electricity insights'}
     subtitle={isWater?'Understand your water use and upcoming bill.':'See your electricity trend and recorded bills.'}>
     {loading?<ActivityIndicator color={C.green}/>:null}
-    <View style={[S.heroCard,{backgroundColor:isWater?'#176E78':'#71542B'}]}>
+    <View style={[S.heroCard,{backgroundColor:isWater?'#176E78':'#245C91'}]}>
       <View style={S.between}>
         <Text style={S.heroEyebrow}>{isWater?'NEXT BILLING CYCLE · HISTORICAL BASELINE':'NEXT BILLING CYCLE · RECORDED BASELINE'}</Text>
         <Text style={{fontSize:10,fontWeight:'800',color:'#E8F4F4'}}>ESTIMATE</Text>
@@ -49,7 +49,7 @@ export function UtilityDetail({kind}:{kind:UtilityKind}){
       <View style={S.between}><Label>{isWater?'Past billing cycles':'Electricity usage history'}</Label><Text style={S.muted}>{bills.length} records</Text></View>
       {bills.length?<View style={{height:132,flexDirection:'row',alignItems:'flex-end',justifyContent:'space-around',gap:10,paddingTop:12}}>
         {bills.slice(-6).map(bill=><View key={bill.id} style={{flex:1,alignItems:'center',justifyContent:'flex-end',gap:7,height:'100%'}}>
-          <View style={{width:'70%',maxWidth:34,height:Math.max(14,bill.units/maxUnits*86),borderRadius:7,backgroundColor:bill===bills[bills.length-1]?C.green:(isWater?'#8ACFD0':'#E3B95B')}}/>
+          <View style={{width:'70%',maxWidth:34,height:Math.max(14,bill.units/maxUnits*86),borderRadius:7,backgroundColor:isWater?(bill===bills[bills.length-1]?C.green:'#8ACFD0'):(bill===bills[bills.length-1]?'#3274B8':'#A8C8E8')}}/>
           <Text style={[S.muted,{fontSize:10}]}>{bill.period_start.slice(5,7)}/{bill.period_start.slice(2,4)}</Text>
         </View>)}
       </View>:<View style={{borderRadius:14,backgroundColor:C.bg,padding:14}}>
@@ -76,7 +76,7 @@ export function UtilityDetail({kind}:{kind:UtilityKind}){
       <Label>About this baseline</Label>
       <Note>{data?.method||'The estimate will appear after you record a bill.'}</Note>
       {data?.assumptions.map((assumption,index)=><Note key={index}>• {assumption}</Note>)}
-      <Note>This screen shows recorded history; the demo does not calculate appliance savings or a live meter reading.</Note>
+      <Note>This screen shows recorded history; appliance savings and live meter readings are not available.</Note>
     </Card>}
 
     {isWater?<Card>
