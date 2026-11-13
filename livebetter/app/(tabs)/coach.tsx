@@ -7,12 +7,19 @@ import {money,S,C} from '../../src/theme';
 import {Btn,Card,Label,Page} from '../../src/ui';
 
 type CoachAction={label:string;href:'/pantry'|'/utilities'|'/activity'};
-type CoachReply={text:string;action?:CoachAction};
+type LocalReply={text:string;action?:CoachAction};
 type Message={role:'assistant'|'user';text:string;action?:CoachAction};
 const suggestions=['How can I spend less?','What can I cook?','Why this forecast?','Try a water scenario'];
 
 export default function Coach(){
-  const {state,insights,scenario}=useApp();
+  const {state,insights,scenario,ask,demo}=useApp();
+  // Live mode: Big Brain coach on the backend (POST /household/coach): answers from this household's modules.
+  async function live(question:string):Promise<LocalReply>{
+    const r=await ask(question);
+    const href:CoachAction['href']=r.intent==='cook'||r.intent==='food'?'/pantry':'/utilities';
+    const extra=r.actions?.length?'\n\n'+r.actions.slice(0,3).map((a,i)=>`${i+1}. ${a.title}${a.estimated_savings_mur?` (about ${money(a.estimated_savings_mur)})`:''}`).join('\n'):'';
+    return {text:r.answer+extra,action:{label:href==='/pantry'?'Check pantry & recipes':'View utility insights',href}};
+  }
   const [data,setData]=useState<Insight|null>(null);
   const [loading,setLoading]=useState(true);
   const [sending,setSending]=useState(false);
@@ -30,7 +37,8 @@ export default function Coach(){
     return()=>{active=false;};
   },[insights,state]);
 
-  async function answer(question:string):Promise<CoachReply>{
+  async function answer(question:string):Promise<LocalReply>{
+    if(!demo)return live(question);
     const text=question.toLowerCase();
     if(text.includes('cook')||text.includes('pantry')||text.includes('meal')){
       const available=state.pantry.filter(item=>item.available&&item.quantity>0);

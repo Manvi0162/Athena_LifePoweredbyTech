@@ -18,31 +18,36 @@ export async function saveSession(s: Session) { session = s; await AsyncStorage.
 export async function clearSession() { session = { token: null }; await AsyncStorage.removeItem(SESSION_KEY); }
 
 export class ApiError extends Error {
-  status: number; code?: string;
-  constructor(message: string, status: number, code?: string) { super(message); this.status = status; this.code = code; }
+  status: number; code?: string; details?: any;
+  constructor(message: string, status: number, code?: string, details?: any) {
+    super(message); this.status = status; this.code = code; this.details = details;
+  }
 }
 
 function errorMessage(result: any, status: number, path: string) {
   const d = result?.detail;
-  if (d && typeof d === 'object') return { message: d.message || JSON.stringify(d), code: d.code };
+  if (d && typeof d === 'object' && !Array.isArray(d)) return { message: d.message || JSON.stringify(d), code: d.code, details: d.details };
   if (Array.isArray(d)) return { message: d.map((x: any) => x.msg).join('; '), code: 'validation_error' };
   return { message: result?.message || (typeof d === 'string' ? d : `HTTP ${status}: ${path}`), code: result?.code };
 }
 
-export async function request<T>(path: string, method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE' = 'GET', body?: unknown): Promise<T> {
+// stepUp = one-time permission from drawing the security pattern (misuse safeguard), sent as X-Step-Up.
+export async function request<T>(path: string, method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE' = 'GET', body?: unknown,
+  stepUp?: string): Promise<T> {
   if (!URL) throw Error('Backend URL missing. Set EXPO_PUBLIC_API_URL in .env.local.');
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 20000);
   try {
     const headers: Record<string, string> = { Accept: 'application/json', 'Content-Type': 'application/json' };
     if (session.token) headers.Authorization = `Bearer ${session.token}`;
+    if (stepUp) headers['X-Step-Up'] = stepUp;
     const response = await fetch(`${URL}${path}`, {
       method, headers, body: body === undefined ? undefined : JSON.stringify(body), signal: controller.signal });
     let result: unknown = null;
     try { result = await response.json(); } catch {}
     if (!response.ok) {
       const e = errorMessage(result, response.status, path);
-      throw new ApiError(e.message, response.status, e.code);
+      throw new ApiError(e.message, response.status, e.code, e.details);
     }
     return result as T;
   } finally { clearTimeout(timer); }
@@ -70,7 +75,11 @@ export const routes = {
   onboarding: '/households/onboarding', bills: '/bills', forecasts: '/utilities/forecast',
   parse: '/receipts/parse', confirm: '/receipts/confirm', pantry: '/pantry',
   recipes: '/recipes/ranked', insights: '/household/insights', scenario: '/household/scenarios',
-  coach: '/household/coach', activity: '/activity', sample: '/demo/sample', reset: '/demo/reset',
+  coach: '/household/coach', activity: '/activity', sample: '/demo/sample', reset: '/account/reset',
+  mfa: '/auth/mfa', authMe: '/auth/me',
+  security: '/security/status', pattern: '/security/pattern', verifyPattern: '/security/pattern/verify',
+  authSetup: '/security/authenticator/setup', authConfirm: '/security/authenticator/confirm',
+  authDisable: '/security/authenticator/disable', restore: '/account/restore', resetStatus: '/account/reset-status',
 };
 export type ParsedReceipt = {
   items: ReceiptItem[]; receipt_id?: string; status?: string; retailer?: string | null;

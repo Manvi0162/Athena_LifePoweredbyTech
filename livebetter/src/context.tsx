@@ -1,14 +1,26 @@
 import React,{createContext,useCallback,useContext,useEffect,useMemo,useState} from 'react';
 import {ApiError,DEMO_MODE,ParsedReceipt,categoryParams,clearSession,getSession,loadSession,newOperationId,request,routes,saveSession,uploadImage} from './api';
 import {getRecipes,loadDemo,mockForecast,mockInsights,mockScenario,putBill,putCooking,putHousehold,putPantry,putReceipt,resetDemo,saveDemo} from './mock';
-import {Activity,Bill,CoachReply,Forecast,Household,Insight,PantryItem,ReceiptItem,Recipe,Scenario,Snapshot,UtilityKind} from './types';
+import {Activity,AuthenticatorSetup,Bill,CoachReply,Forecast,Household,Insight,LoginResult,PantryItem,ReceiptItem,Recipe,ResetStatus,Scenario,SecurityStatus,SensitiveAction,Snapshot,UtilityKind} from './types';
 
 type Context={
   ready:boolean;busy:boolean; demo:boolean; state:Snapshot; error:string|null; signedIn:boolean;
   clearError:()=>void; clearDemo:()=>Promise<void>;
-  login:(email:string,password:string)=>Promise<{household:boolean}>; signup:(email:string,password:string)=>Promise<string>;
+  login:(email:string,password:string)=>Promise<LoginResult>;
+  loginCode:(mfaToken:string,code:string,recovery?:boolean)=>Promise<LoginResult>;
+  signup:(name:string,email:string,password:string)=>Promise<string>;
   logout:()=>Promise<void>; loadSample:()=>Promise<void>; refreshAll:()=>Promise<void>;
-  onboard:(v:Omit<Household,'id'>)=>Promise<void>;
+  onboard:(v:Omit<Household,'id'>,stepUp?:string)=>Promise<void>;
+  deleteBill:(bill:Bill,stepUp:string)=>Promise<void>;
+  // misuse safeguards (backend: core/security.py)
+  securityStatus:()=>Promise<SecurityStatus>;
+  setPattern:(pattern:number[],proof:{password?:string;code?:string;recovery_code?:string})=>Promise<SecurityStatus>;
+  verifyPattern:(action:SensitiveAction,pattern:number[])=>Promise<string>;
+  authenticatorSetup:()=>Promise<AuthenticatorSetup>;
+  authenticatorConfirm:(code:string)=>Promise<string[]>;
+  authenticatorDisable:(proof:{code?:string;recovery_code?:string},stepUp:string)=>Promise<SecurityStatus>;
+  resetAccount:(stepUp:string)=>Promise<string>; restoreAccount:(stepUp:string)=>Promise<string>;
+  resetStatus:()=>Promise<ResetStatus>;
   addBill:(v:Omit<Bill,'id'|'household_id'|'currency'>)=>Promise<void>;
   addItem:(v:Omit<PantryItem,'id'> & {id?:string})=>Promise<void>;
   confirmReceipt:(items:ReceiptItem[],receiptId?:string)=>Promise<void>;
@@ -74,31 +86,46 @@ export function AppProvider({children}:{children:React.ReactNode}){
   },[]);
   const refreshAll=useCallback(async()=>{if(!DEMO_MODE)await loadLive();},[loadLive]);
 
-  const login=async(email:string,password:string)=>{
-    let household=false;
-    await execute(async()=>{
-      const r=await request<{token:string;refresh_token?:string;mode?:string;user?:{email:string}}>(routes.login,'POST',{email,password});
-      await saveSession({token:r.token,refresh_token:r.refresh_token,email:r.user?.email,mode:r.mode});
-      setSignedIn(true);await loadLive();
-      household=!!(await request<{household:Household}>(routes.me).catch(()=>null));
-    });
-    return {household};
+  type Session={token:string;refresh_token?:string;mode?:string;user?:{email:string}};
+  const startSession=async(r:Session,email:string)=>{
+    await saveSession({token:r.token,refresh_token:r.refresh_token,email:r.user?.email||email,mode:r.mode});
+    setSignedIn(true);await loadLive();
+    return !!(await request<{household:Household|null}>(routes.me).then(x=>x.household).catch(()=>null));
   };
-  const signup=async(email:string,password:string)=>{
+  const login=async(email:string,password:string):Promise<LoginResult>=>{
+    if(DEMO_MODE){setSignedIn(true);return {household:!!state.household};}
+    let out:LoginResult={household:false};
+    await execute(async()=>{
+      const r=await request<Session&{mfa_required?:boolean;mfa_token?:string;message?:string}>(routes.login,'POST',{email,password});
+      if(r.mfa_required&&r.mfa_token){out={household:false,mfa:{token:r.mfa_token,message:r.message||'Enter the code from Microsoft Authenticator.'}};return;}
+      out={household:await startSession(r,email)};
+    });
+    return out;
+  };
+  const loginCode=async(mfaToken:string,code:string,recovery=false):Promise<LoginResult>=>{
+    let out:LoginResult={household:false};
+    await execute(async()=>{
+      const r=await request<Session>(routes.mfa,'POST',recovery?{mfa_token:mfaToken,recovery_code:code.trim()}:{mfa_token:mfaToken,code:code.trim()});
+      out={household:await startSession(r,r.user?.email||'')};
+    });
+    return out;
+  };
+  const signup=async(name:string,email:string,password:string)=>{
+    if(DEMO_MODE){setSignedIn(true);return 'Demo mode: nothing is sent to a server.';}
     let message='';
     await execute(async()=>{
-      const r=await request<{token:string|null;message?:string;refresh_token?:string}>(routes.signup,'POST',{email,password});
-      if(r.token){await saveSession({token:r.token,refresh_token:r.refresh_token,email});setSignedIn(true);message='Account created.';}
-      else message=r.message||'Account created. Confirm your email, then sign in.';
+      const r=await request<{token:string|null;message?:string;refresh_token?:string;mode?:string}>(routes.signup,'POST',{name,email,password});
+      if(r.token){await saveSession({token:r.token,refresh_token:r.refresh_token,email,mode:r.mode});setSignedIn(true);message='Account created.';}
+      else message=r.message||'Account created. Confirm your email, then log in.';
     });
     return message;
   };
   const logout=async()=>{await clearSession();setSignedIn(false);setState(empty);};
   const loadSample=async()=>execute(async()=>{await request(routes.sample,'POST');await loadLive();});
 
-  const onboard=async(v:Omit<Household,'id'>)=>execute(async()=>{
+  const onboard=async(v:Omit<Household,'id'>,stepUp?:string)=>execute(async()=>{
     if(!DEMO_MODE){
-      const response=await request<{id?:string;household?:Household}>(routes.onboarding,'POST',{...v});
+      const response=await request<{id?:string;household?:Household}>(routes.onboarding,'POST',{...v},stepUp);
       if(!response?.household?.id)throw Error('Onboarding API did not return a household.');
       await loadLive();return;
     }
@@ -107,6 +134,12 @@ export function AppProvider({children}:{children:React.ReactNode}){
   const addBill=async(v:Omit<Bill,'id'|'household_id'|'currency'>)=>execute(async()=>{
     if(!DEMO_MODE){await request(routes.bills,'POST',{...v,currency:'MUR'});await loadLive();return;}
     await commit(putBill(state,v));
+  });
+  const deleteBill=async(bill:Bill,stepUp:string)=>execute(async()=>{
+    if(DEMO_MODE){await commit({...state,bills:state.bills.filter(b=>b.id!==bill.id)});return;}
+    const [kind,id]=bill.id.includes(':')?bill.id.split(':'):[bill.kind,bill.id];
+    await request(`/bills/${kind}/${encodeURIComponent(id)}`,'DELETE',undefined,stepUp);
+    await loadLive();
   });
   const refreshPantry=useCallback(async()=>{
     if(DEMO_MODE)return;
@@ -175,13 +208,33 @@ export function AppProvider({children}:{children:React.ReactNode}){
     loadLive().catch(()=>undefined);
     return r;
   };
-  const clearDemo=async()=>{
-    if(DEMO_MODE){setState(await resetDemo());return;}
-    await execute(async()=>{await request(routes.reset,'POST');await loadLive();});
-  };
+  const clearDemo=async()=>{if(DEMO_MODE)setState(await resetDemo());};
+
+  // ---- misuse safeguards: every sensitive request carries a one-time permission from the pattern ----
+  const live=()=>{if(DEMO_MODE)throw Error('Security features need the LiveBetter backend (set EXPO_PUBLIC_USE_MOCKS=false).');};
+  const securityStatus=useCallback(async()=>{live();return request<SecurityStatus>(routes.security);},[]);
+  const setPattern=async(pattern:number[],proof:{password?:string;code?:string;recovery_code?:string})=>{
+    live();return request<SecurityStatus>(routes.pattern,'PUT',{pattern,...proof});};
+  const verifyPattern=async(action:SensitiveAction,pattern:number[])=>{
+    live();return (await request<{step_up_token:string}>(routes.verifyPattern,'POST',{pattern,action})).step_up_token;};
+  const authenticatorSetup=async()=>{live();return request<AuthenticatorSetup>(routes.authSetup,'POST');};
+  const authenticatorConfirm=async(code:string)=>{
+    live();return (await request<{recovery_codes:string[]}>(routes.authConfirm,'POST',{code:code.trim()})).recovery_codes;};
+  const authenticatorDisable=async(proof:{code?:string;recovery_code?:string},stepUp:string)=>{
+    live();return request<SecurityStatus>(routes.authDisable,'POST',proof,stepUp);};
+  const resetAccount=async(stepUp:string)=>{
+    live();let message='';
+    await execute(async()=>{message=(await request<{message:string}>(routes.reset,'POST',undefined,stepUp)).message;await loadLive();});
+    return message;};
+  const restoreAccount=async(stepUp:string)=>{
+    live();let message='';
+    await execute(async()=>{message=(await request<{message:string}>(routes.restore,'POST',undefined,stepUp)).message;await loadLive();});
+    return message;};
+  const resetStatus=useCallback(async()=>{live();return request<ResetStatus>(routes.resetStatus);},[]);
   const value=useMemo(()=>({ready,busy,demo:DEMO_MODE,state,error,signedIn,clearError:()=>setError(null),clearDemo,
-    login,signup,logout,loadSample,refreshAll,onboard,addBill,addItem,confirmReceipt,parseReceipt,forecast,insights,recipes,
-    cook,scenario,ask,refreshPantry}),
+    login,loginCode,signup,logout,loadSample,refreshAll,onboard,deleteBill,addBill,addItem,confirmReceipt,parseReceipt,forecast,
+    insights,recipes,cook,scenario,ask,refreshPantry,securityStatus,setPattern,verifyPattern,authenticatorSetup,
+    authenticatorConfirm,authenticatorDisable,resetAccount,restoreAccount,resetStatus}),
     // Event handlers bind the latest state each render.
     [ready,busy,state,error,signedIn]);
   // Screens mount only after the saved login is loaded, so their first requests carry the token.

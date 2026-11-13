@@ -369,6 +369,25 @@ def coach(body: CoachIn):
 
 
 # ---------------- activity ----------------
+SECURITY_LABELS = {
+    "pattern_set": "Security pattern set", "pattern_changed": "Security pattern changed",
+    "pattern_ok": "Pattern accepted to {what}", "pattern_failed": "Wrong pattern while trying to {what}",
+    "pattern_locked": "Pattern locked for 5 minutes after 5 wrong tries ({what})",
+    "blocked": "BLOCKED: someone tried to {what} without the pattern", "allowed": "Allowed: {what}",
+    "authenticator_on": "Microsoft Authenticator switched on", "authenticator_off": "Microsoft Authenticator switched off",
+    "code_failed": "Wrong authenticator code", "code_locked": "Authenticator codes locked for 5 minutes",
+    "password_failed": "Wrong password in a security check", "recovery_code_used": "A recovery code was used",
+    "login_with_authenticator": "Logged in with Microsoft Authenticator",
+    "account_reset": "Account reset (restorable for 24 hours)", "account_restored": "Account restored after a reset",
+}
+
+
+def _security_label(ev, d):
+    from core.security import SENSITIVE
+    what = SENSITIVE.get(d.get("action"), "do a protected action")
+    return "Security · " + SECURITY_LABELS.get(ev.split(".", 1)[1], ev).format(what=what)
+
+
 LABELS = {
     "receipt_confirmed": lambda d: f"Confirmed grocery purchase (Rs {d.get('total', 0):,.2f})" if d.get("total") is not None
     else "Confirmed grocery purchase",
@@ -408,7 +427,8 @@ def activity(limit: int = 100):
         d = r.get("details") or {}
         ev = r["event_type"]
         try:
-            msg = LABELS[ev](d) if ev in LABELS else ev.replace(".", ": ").replace("_", " ").capitalize()
+            msg = (_security_label(ev, d) if ev.startswith("security.") else
+                   LABELS[ev](d) if ev in LABELS else ev.replace(".", ": ").replace("_", " ").capitalize())
         except Exception:
             msg = ev
         out.append({"id": r["id"], "at": r["created_at"], "message": msg,

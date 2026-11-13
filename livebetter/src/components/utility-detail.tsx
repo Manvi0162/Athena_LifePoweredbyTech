@@ -4,10 +4,12 @@ import {router} from 'expo-router';
 import {useApp} from '../context';
 import {Forecast,Scenario,UtilityKind} from '../types';
 import {money,S,C} from '../theme';
-import {Btn,Card,Field,Label,Note,Page} from '../ui';
+import {usePattern} from '../pattern';
+import {Btn,Card,Field,Label,Note,Page,readError} from '../ui';
 
 export function UtilityDetail({kind}:{kind:UtilityKind}){
-  const {state,forecast,scenario}=useApp();
+  const {state,forecast,scenario,deleteBill}=useApp();
+  const guard=usePattern();   // deleting a bill removes evidence: the pattern is required
   const [data,setData]=useState<Forecast|null>(null);
   const [result,setResult]=useState<Scenario|null>(null);
   const [reduction,setReduction]=useState('10');
@@ -34,6 +36,7 @@ export function UtilityDetail({kind}:{kind:UtilityKind}){
   const maxUnits=Math.max(1,...bills.map(bill=>bill.units));
   return <Page back title={isWater?'Water intelligence':'Electricity insights'}
     subtitle={isWater?'Understand your water use and upcoming bill.':'See your electricity trend and recorded bills.'}>
+    {guard.prompt}
     {loading?<ActivityIndicator color={C.green}/>:null}
     <View style={[S.heroCard,{backgroundColor:isWater?'#176E78':'#245C91'}]}>
       <View style={S.between}>
@@ -57,7 +60,10 @@ export function UtilityDetail({kind}:{kind:UtilityKind}){
       </View>}
       {bills.slice(-3).reverse().map(bill=><View key={bill.id} style={{paddingVertical:9,borderTopWidth:1,borderTopColor:C.line}}>
         <View style={S.between}><Text style={S.body}>{bill.period_start} – {bill.period_end}</Text><Text style={S.title}>{money(bill.amount)}</Text></View>
-        <Note>{bill.units} {isWater?'m³':'kWh'} · {bill.tariff}</Note>
+        <View style={S.between}><Note>{bill.units} {isWater?'m³':'kWh'} · {bill.tariff}</Note>
+          <Pressable accessibilityRole="button" accessibilityLabel={`Delete bill ${bill.period_start}`}
+            onPress={()=>guard.ask('delete_bill',async t=>{try{await deleteBill(bill,t);}catch(e){Alert.alert('Not deleted',readError(e));}})}>
+            <Text style={{color:C.red,fontWeight:'700',fontSize:12}}>🔒 Delete</Text></Pressable></View>
       </View>)}
       <Btn title={isWater?'Add a water bill':'Add an electricity bill'} onPress={()=>router.push({pathname:'/bill',params:{kind}})}/>
     </Card>

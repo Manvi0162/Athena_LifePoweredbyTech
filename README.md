@@ -5,6 +5,8 @@ This repository contains the team project for the Life Powered by Tech hackathon
 ## Project structure
 
 - `livebetter/` — active mobile frontend app used for demo mode and live integration work
+- `backend/` — the one FastAPI backend: login, water, electricity, food, Big Brain, security (see `backend/README.md`)
+- `research/big_brain/` — Manvi's Big Brain notebooks (originals; the backend uses the ported functions)
 - `LiveBetter_Frontend_Starter/` — starter project and installation guidance
 - `kentish/` — separate Expo experiment/prototype folder
 - `README.md` — repo-level overview for the team
@@ -119,8 +121,9 @@ The app uses Expo Router. The active route URLs are:
 |---|---|---|
 | `/` | `app/index.tsx` | root redirect page |
 | `/welcome` | `app/welcome.tsx` | first entry screen |
-| `/login` | `app/login.tsx` | login placeholder screen |
-| `/register` | `app/register.tsx` | registration placeholder screen |
+| `/login` | `app/login.tsx` | email + password; then the Microsoft Authenticator code if switched on |
+| `/register` | `app/register.tsx` | create an account (backend `POST /auth/signup`) |
+| `/security` | `app/security.tsx` | security pattern + optional Microsoft Authenticator (after registration and from Settings) |
 | `/onboarding` | `app/onboarding.tsx` | household setup flow |
 | `/(tabs)/home` | `app/(tabs)/home.tsx` | main dashboard |
 | `/(tabs)/utilities` | `app/(tabs)/utilities.tsx` | utility overview |
@@ -145,9 +148,8 @@ The app uses Expo Router. The active route URLs are:
 /welcome
    -> /login or /register
 
-/login or /register
-   -> user enters details (placeholder UI for now)
-   -> /onboarding
+/register -> /security?setup=1 (set pattern; "Do you want Microsoft Authenticator?" yes / not now) -> /onboarding
+/login -> (code from Microsoft Authenticator, if on) -> /(tabs)/home, or /onboarding if no household yet
 
 /onboarding
    -> save household setup
@@ -191,6 +193,29 @@ The app uses `DEMO_MODE = process.env.EXPO_PUBLIC_USE_MOCKS !== 'false'` in `src
 ### UI shell
 `src/ui.tsx` provides the shared screen layout and tab navigation. Most pages use the generic `Page` component with common cards, buttons, and form fields.
 
+## Surprise card: Misuse
+
+**Misuse we identified:** someone who picks up the owner's unlocked, signed-in phone (a child playing, a housemate,
+a controlling partner) taps *Reset account*, deletes bills, changes the household details or switches security
+off. The household loses its records and evidence (bills are proof of what was paid), and Big Brain gives
+wrong advice.
+
+**Safeguards (checked by the backend, not just hidden in the app):**
+
+| Safeguard | How |
+|---|---|
+| Security pattern for protected actions | reset account, restore after a reset, delete/replace a bill, change household details, switch security off. Drawing it gives a one-time permission for that one action, valid 5 minutes (`X-Step-Up` header) |
+| Lockout | 5 wrong patterns, passwords or codes → locked 5 minutes |
+| The owner sees attempts | red alert on Home and in Settings → Security; every attempt in Activity ("BLOCKED: someone tried to reset the account without the pattern") |
+| Undo | a reset hides the records and can be restored for 24 hours (pattern needed) |
+| Microsoft Authenticator (optional) | offered after registration and in Settings → Security; login then needs password + 6-digit code; 8 one-time recovery codes; switching it off needs pattern AND code |
+| Pattern can't be changed by the misuser | setting/changing it needs the account password (or an authenticator/recovery code) |
+
+**Demo (2 minutes):** Settings → *Reset account* → draw a wrong pattern twice ("3 attempts left") → Cancel →
+Home shows the red security alert → Activity shows the blocked attempts → owner draws the right pattern →
+reset → *Restore my records* → everything is back. Then sign out and log in with the authenticator code.
+Automated: `backend/tests/test_security.py` (6 tests).
+
 ## Quick team usage checklist
 
 1. open the app in `/livebetter`
@@ -206,7 +231,8 @@ The app uses `DEMO_MODE = process.env.EXPO_PUBLIC_USE_MOCKS !== 'false'` in `src
 ## Notes for the team
 
 - This frontend is designed to be functional in demo mode before any backend contract is finalized.
-- The app explicitly does not claim real tariff calculations, OCR reading, or live backend authentication unless those services are connected.
+- In live mode (`EXPO_PUBLIC_USE_MOCKS=false`) login, registration, security and every module run on the backend.
+  Demo (mock) mode still works offline, but the security features need the backend.
 - Do not store real personal information in demo data or commit secrets into `.env.local`.
 
 For app-specific setup and command details, see the README inside `livebetter/`.

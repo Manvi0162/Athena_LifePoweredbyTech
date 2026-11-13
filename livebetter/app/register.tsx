@@ -1,16 +1,18 @@
 import React,{useState} from 'react';
 import {Alert,Text,View} from 'react-native';
 import {router} from 'expo-router';
-import {Btn,Card,Field,Label,Note,Page} from '../src/ui';
+import {useApp} from '../src/context';
+import {Btn,Card,Field,Label,Note,Page,readError} from '../src/ui';
 import {S} from '../src/theme';
 
 export default function Register(){
+  const {signup,demo}=useApp();
   const [name,setName]=useState('');
   const [email,setEmail]=useState('');
   const [password,setPassword]=useState('');
   const [confirmPassword,setConfirmPassword]=useState('');
 
-  function createAccount(){
+  async function createAccount(){
     if(!name.trim())return Alert.alert('Name required','Enter your name to continue.');
     if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
       return Alert.alert('Check your email','Enter a valid email address.');
@@ -18,8 +20,12 @@ export default function Register(){
       return Alert.alert('Password too short','Use at least 8 characters.');
     if(password!==confirmPassword)
       return Alert.alert('Passwords do not match','Re-enter your password confirmation.');
-    Alert.alert('Registration unavailable',
-      'Account registration is not connected yet. Your details have not been saved.');
+    try{
+      const message=await signup(name.trim(),email.trim(),password);
+      if(demo){router.replace('/onboarding');return;}
+      if(message.startsWith('Account created.'))router.replace({pathname:'/security',params:{setup:'1'}});
+      else{Alert.alert('Check your email',message);router.replace('/login');}
+    }catch(error){Alert.alert('Could not create account',readError(error));}
   }
 
   return <Page showTabs={false} title="Create your account"
@@ -34,8 +40,8 @@ export default function Register(){
         placeholder="At least 8 characters" secureTextEntry/>
       <Field label="Confirm password" value={confirmPassword} onChangeText={setConfirmPassword}
         placeholder="Re-enter your password" secureTextEntry/>
-      <Btn title="Create account" onPress={createAccount}/>
-      <Note>Account registration is not connected yet. Your details will not be stored.</Note>
+      <Btn title="Create account" onPress={()=>void createAccount()}/>
+      <Note>{demo?'Demo mode: nothing is sent to a server.':'Next: set a security pattern, and choose whether to add Microsoft Authenticator.'}</Note>
     </Card>
     <View style={[S.card,{alignItems:'center'}]}>
       <Text style={S.muted}>Already have an account?</Text>

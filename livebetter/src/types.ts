@@ -31,7 +31,10 @@ export type Insight = { period_start: string | null; period_end: string | null; 
   total: number | null; assumptions: string[]; recommendations: string[]; method: string;
   source_data: string[];
   // Big Brain dashboard (live backend)
-  actions?: BigBrainAction[]; module_status?: Record<string, string>; outlook?: any };
+  actions?: BigBrainAction[]; module_status?: Record<string, string>; outlook?: any;
+  // Big Brain v3 (Manvi): plan summary + savings compared per 30 days
+  big_brain_summary?: string; savings_30d?: { rank: number; module: string; action_id: string; title: string;
+    normalized_savings_30d_mur: number; estimated_savings_mur: number; savings_period: string; ai_explanation?: string }[] };
 export type Scenario = { baseline: number | null; adjusted: number | null; delta: number | null;
   unit_change: number | null; message: string; assumptions: string[]; status?: string; unit?: string };
 export type CoachReply = { answer: string; intent: string; source: string; suggestions?: string[];
@@ -39,3 +42,14 @@ export type CoachReply = { answer: string; intent: string; source: string; sugge
 export type Snapshot = { household: Household | null; bills: Bill[]; pantry: PantryItem[];
   receipts: { id: string; at: string; total: number }[];
   activity: Activity[]; completed_actions: string[] };
+
+// ---- misuse safeguards (surprise card) ----
+export type SensitiveAction = 'reset_account' | 'restore_account' | 'delete_bill' | 'edit_household' | 'security_off';
+export type SecurityEvent = { at: string; event: string; action?: string; [k: string]: unknown };
+export type SecurityStatus = { pattern_set: boolean; pattern_set_at?: string | null; authenticator_on: boolean;
+  recovery_codes_left: number; locks: Record<string, string>;
+  alert: { count: number; last_at: string; message: string } | null;
+  recent_events: SecurityEvent[]; protected_actions: Record<SensitiveAction, string> };
+export type AuthenticatorSetup = { otpauth_uri: string; qr_png: string; manual_key: string; note: string };
+export type ResetStatus = { restorable: boolean; reset_at?: string; restore_until?: string };
+export type LoginResult = { household: boolean; mfa?: { token: string; message: string } };

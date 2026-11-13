@@ -2,13 +2,15 @@ import React,{useEffect,useState} from 'react';
 import {ActivityIndicator,Alert,Pressable,Text,View} from 'react-native';
 import {router} from 'expo-router';
 import {useApp} from '../../src/context';
-import {Insight} from '../../src/types';
+import {Insight,SecurityStatus} from '../../src/types';
 import {money,S,C} from '../../src/theme';
 import {ActionRow,Btn,Card,Label,Note,Page} from '../../src/ui';
 
 export default function Home(){
-  const {state,insights}=useApp();
+  const {state,insights,demo,securityStatus}=useApp();
   const [summary,setSummary]=useState<Insight|null>(null);
+  const [sec,setSec]=useState<SecurityStatus|null>(null);
+  useEffect(()=>{if(!demo)securityStatus().then(setSec).catch(()=>undefined);},[demo,securityStatus,state]);
   const [loading,setLoading]=useState(true);
 
   useEffect(()=>{
@@ -19,7 +21,17 @@ export default function Home(){
     return()=>{active=false;};
   },[insights,state]);
 
+  const priorities=(summary?.actions||[]).filter(a=>a.kind!=='unlock').slice(0,3);
   return <Page back={false} title="Your household" subtitle={`${state.household?.name||'Welcome home'} · Monthly overview`} showSettings>
+    {sec?.alert?<Pressable accessibilityRole="button" onPress={()=>router.push('/security')} style={[S.card,{backgroundColor:C.dangerBg}]}>
+      <Text style={[S.title,{color:C.red}]}>⚠ Security alert</Text>
+      <Text style={[S.body,{color:C.red}]}>{sec.alert.message}</Text>
+      <Text style={[S.muted,{fontWeight:'700'}]}>Tap to review →</Text>
+    </Pressable>:null}
+    {sec&&!sec.pattern_set?<Pressable accessibilityRole="button" onPress={()=>router.push('/security')} style={[S.card,{backgroundColor:C.amber}]}>
+      <Text style={S.title}>Set a security pattern</Text>
+      <Note>Without it, anyone using this phone could reset your account or delete bills. Tap to set it.</Note>
+    </Pressable>:null}
     <View style={S.heroCard}>
       <Text style={S.heroEyebrow}>NEXT BILLING CYCLE · UTILITIES</Text>
       {loading?<ActivityIndicator color={C.white}/>:<>
@@ -56,6 +68,17 @@ export default function Home(){
       </View>
       <Note>Groceries are confirmed purchases, not a future spending forecast.</Note>
     </View>
+
+    {summary?.big_brain_summary||priorities.length?<Card>
+      <View style={S.between}><Label>Big Brain priorities</Label><Text style={S.muted}>ALL MODULES</Text></View>
+      {summary?.big_brain_summary?<Text style={S.body}>{summary.big_brain_summary}</Text>:null}
+      {priorities.map((a,i)=><View key={`${a.module}:${a.action_id}`} style={{gap:3,paddingVertical:8,borderTopWidth:1,borderTopColor:C.line}}>
+        <View style={S.between}><Text style={[S.title,{flex:1}]}>{i+1}. {a.title}</Text>
+          {a.estimated_savings_mur?<Text style={{color:C.green,fontWeight:'800'}}>{money(a.estimated_savings_mur)}</Text>:null}</View>
+        <Note>{a.module.toUpperCase()} · {a.explanation}</Note>
+      </View>)}
+      <Btn title="Ask the AI Coach about these" outline onPress={()=>router.navigate('/(tabs)/coach')}/>
+    </Card>:null}
 
     <Card>
       <View style={S.between}><Label>What needs attention?</Label><Text style={S.muted}>TODAY</Text></View>
