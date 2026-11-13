@@ -1,0 +1,22 @@
+{
+ "note": "Demo household. Water bills are PLACEHOLDERS (sized from the Mauritian average 198.9 L/person/day x 4 people) until a real CWA bill is entered; entering the first real bill removes them. Daily values are synthetic, calibrated to each bill.",
+ "seed": "athena-demo",
+ "today": "2026-11-13",
+ "profile": {
+  "members": 4,
+  "sewer": false,
+  "region": "Centre",
+  "monthly_budget_rs": 250,
+  "showers_per_day": null,
+  "shower_minutes": 7.7,
+  "shower_flow_l_per_min": null
+ },
+ "bills": [
+  {"id": "demo1", "start": "2026-07-13", "end": "2026-08-13", "m3": 24.7, "end_reading": null, "source": "placeholder"},
+  {"id": "demo2", "start": "2026-08-13", "end": "2026-09-13", "m3": 23.1, "end_reading": null, "source": "placeholder"},
+  {"id": "demo3", "start": "2026-09-13", "end": "2026-10-13", "m3": 24.0, "end_reading": 1452.0, "source": "placeholder"}
+ ],
+ "readings": [],
+ "actions": [],
+ "activity": []
+}

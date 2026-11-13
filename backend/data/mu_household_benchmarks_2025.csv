@@ -1,8 +1,0 @@
-indicator,value,unit,source
-water_domestic_l_per_person_day,198.9,litres,"Statistics Mauritius ESI 1929, Table 1"
-water_domestic_m3_per_subscriber_year,225,m3,"Statistics Mauritius ESI 1929, Table 16"
-water_domestic_avg_price_rs_per_m3,9.97,Rs,"Statistics Mauritius ESI 1929, Table 16"
-electricity_domestic_consumers,484680,consumers,"Statistics Mauritius ESI 1929, Table 11"
-electricity_domestic_sales_mwh,1172239,MWh,"Statistics Mauritius ESI 1929, Table 11"
-electricity_domestic_kwh_per_consumer_month,201.5,kWh,"derived: 1,172,239 MWh / 484,680 consumers / 12"
-electricity_domestic_avg_price_rs_per_kwh,6.52,Rs,"Statistics Mauritius ESI 1929, Table 11 (excl. VAT and meter rent)"
