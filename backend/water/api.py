@@ -9,7 +9,7 @@ from datetime import date
 from datetime import date as Date
 from typing import Literal
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Header
 from pydantic import BaseModel, Field, model_validator
 
 from . import advice, store
@@ -20,8 +20,12 @@ from .auth import err, require_login
 
 try:                                   # merged backend: also write shared tables (core/sync.py)
     from core import sync
+    from core.security import guard
 except ImportError:
     sync = None
+
+    def guard(action, token):          # module used on its own: no pattern check
+        return None
 
 router = APIRouter(prefix="/water", tags=["water"], dependencies=[Depends(require_login)])
 
@@ -183,7 +187,8 @@ def add_bill(b: BillIn):
 
 
 @router.put("/bills/{bill_id}")
-def replace_bill(bill_id: str, b: BillIn):
+def replace_bill(bill_id: str, b: BillIn, x_step_up: str | None = Header(default=None)):
+    guard("delete_bill", x_step_up)     # changing a bill needs the security pattern (misuse safeguard)
     s = store.load()
     if not any(x["id"] == bill_id for x in s["bills"]):
         err(404, "not_found", f"No bill with id {bill_id}")
@@ -191,7 +196,12 @@ def replace_bill(bill_id: str, b: BillIn):
 
 
 @router.delete("/bills/{bill_id}")
-def delete_bill(bill_id: str):
+def delete_bill(bill_id: str, x_step_up: str | None = Header(default=None)):
+    guard("delete_bill", x_step_up)     # deleting a bill needs the security pattern (misuse safeguard)
+    return remove_bill(bill_id)
+
+
+def remove_bill(bill_id: str):
     s = store.load()
     if not any(x["id"] == bill_id for x in s["bills"]):
         err(404, "not_found", f"No bill with id {bill_id}")
@@ -400,7 +410,8 @@ def activity():
 
 
 @router.post("/demo/reset")
-def demo_reset(sample: bool = False):
+def demo_reset(sample: bool = False, x_step_up: str | None = Header(default=None)):
+    guard("reset_account", x_step_up)
     """Empty account (default), or ?sample=true for the FICTIONAL sample household used to rehearse the demo."""
     s = store.reset(sample=sample)
     return {"ok": True, "sample": sample, "note": s.get("note")}

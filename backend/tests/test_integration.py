@@ -33,10 +33,23 @@ def client(tmp_path, monkeypatch):
     config.get_settings.cache_clear()
 
 
+PATTERN = [1, 2, 3, 6, 9]
+
+
+def step_up(c, action):
+    """Draw the security pattern for one sensitive action (misuse safeguard) -> X-Step-Up header."""
+    if not c.get("/security/status").json()["pattern_set"]:
+        assert c.put("/security/pattern", json={"pattern": PATTERN, "password": "demo1234"}).status_code == 200
+    r = c.post("/security/pattern/verify", json={"pattern": PATTERN, "action": action})
+    assert r.status_code == 200, r.text
+    return {"X-Step-Up": r.json()["step_up_token"]}
+
+
 def onboard(c, **extra):
     body = {"name": "Test home", "members": 4, "home_type": "House", "monthly_target": 15000,
             "electricity_tariff": "140", "main_goal": "reduce_expenses", **extra}
-    r = c.post("/households/onboarding", json=body)
+    headers = step_up(c, "edit_household") if c.get("/auth/me").json().get("onboarding_required") is False else {}
+    r = c.post("/households/onboarding", json=body, headers=headers)
     assert r.status_code == 200, r.text
     return r.json()
 
@@ -199,7 +212,8 @@ def test_shared_tables_are_written(client):
     assert any(r["event_type"] == "water.bill_confirmed" for r in db.rows("activity_logs"))
     bill = client.get("/bills").json()[0]
     kind, bid = bill["id"].split(":")
-    assert client.delete(f"/bills/{kind}/{bid}").status_code == 200
+    assert client.delete(f"/bills/{kind}/{bid}").status_code == 403          # no pattern -> refused
+    assert client.delete(f"/bills/{kind}/{bid}", headers=step_up(client, "delete_bill")).status_code == 200
     assert not any(b["kind"] == "water" for b in db.rows("utility_bills"))
 
 
@@ -210,5 +224,7 @@ def test_sample_household(client):
     assert d["module_details"]["water"]["status"] == "better_supported"
     ids = [a["action_id"] for a in d["actions"]]
     assert "use_expiring_items" in ids and "cook_from_pantry" in ids and "shorter_showers_hot_water" not in ids
-    assert client.post("/demo/reset").json()["ok"]
+    assert client.post("/demo/sample").status_code == 409                       # never overwrites real data
+    assert client.post("/demo/reset").status_code == 403
+    assert client.post("/demo/reset", headers=step_up(client, "reset_account")).json()["ok"]
     assert client.get("/utilities/forecast", params={"category": "water"}).json()["value"] is None

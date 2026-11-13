@@ -14,7 +14,7 @@ Nothing here calculates usage or money: it routes to the module that owns the ca
 """
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel, Field, ValidationError
 
 from core.identity import CURRENT, err, forget_household, household, require_context, require_household
@@ -56,8 +56,11 @@ def ui_household(h):
 
 
 @router.post("/households/onboarding")
-def onboarding(body: Onboarding):
+def onboarding(body: Onboarding, x_step_up: str | None = Header(default=None)):
     ctx = require_context()
+    if household(ctx) is not None:                       # changing an existing household needs the pattern
+        from core.security import require_step_up
+        require_step_up(ctx, "edit_household", x_step_up)
     prefs = {k: getattr(body, k) for k in ("home_type", "water_tariff", "electricity_tariff", "diet", "allergies",
                                            "water_habit", "appliance_notes", "occupancy", "main_goal", "region")}
     goals = {"monthly_target": body.monthly_target, "water_budget": body.water_budget,
@@ -171,14 +174,16 @@ def list_bills(category: str | None = Query(default=None)):
 
 
 @router.delete("/bills/{kind}/{bill_id}")
-def delete_bill(kind: str, bill_id: str):
-    require_household()
+def delete_bill(kind: str, bill_id: str, x_step_up: str | None = Header(default=None)):
+    ctx, _ = require_household()
+    from core.security import require_step_up
+    require_step_up(ctx, "delete_bill", x_step_up)        # misuse safeguard: a bill is evidence
     if kind == "water":
         from water import api as wapi
-        return wapi.delete_bill(bill_id)
+        return wapi.remove_bill(bill_id)
     if kind == "electricity":
         from electricity import api as eapi
-        return eapi.delete_bill(bill_id)
+        return eapi.remove_bill(bill_id)
     err(404, "not_found", "Unknown bill kind")
 
 
@@ -401,6 +406,10 @@ def demo_sample():
     """Load the clearly labelled sample household: fictional water bills, the team's real CEB bill history,
     a fictional receipt (pantry) and expiry dates. For rehearsing the demo."""
     ctx = require_context()
+    from electricity import store as estore0
+    from water import store as wstore0
+    if household(ctx) is not None and (wstore0.load().get("bills") or estore0.load().get("bills")):
+        err(409, "has_data", "This account already has bills. Use Settings -> Reset account first (pattern needed).")
     if household(ctx) is None:
         onboarding(Onboarding(name="Sample household (fictional)", members=4, home_type="House", monthly_target=15000,
                               electricity_tariff="140", main_goal="reduce_expenses", region="Centre"))
@@ -433,15 +442,7 @@ def demo_sample():
 
 
 @router.post("/demo/reset")
-def demo_reset():
-    """Empty water and electricity for this household. Food records are only removed in local mode."""
-    ctx, h = require_household()
-    from electricity import store as estore
-    from water import store as wstore
-    wstore.reset(sample=False)
-    estore.reset(sample=False)
-    if ctx.mode == "local":
-        for t in ("pantry_events", "pantry_items", "grocery_receipts", "activity_logs", "utility_bills",
-                  "meter_readings", "household_actions"):
-            ctx.db.table(t).delete().eq("household_id", h["id"]).execute()
-    return {"ok": True}
+def demo_reset(x_step_up: str | None = Header(default=None)):
+    """Same as POST /account/reset (pattern needed, undoable for 24 hours)."""
+    from integration.security_routes import reset_account
+    return reset_account(x_step_up)
