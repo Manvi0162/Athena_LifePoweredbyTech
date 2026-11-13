@@ -17,8 +17,7 @@ export default function Coach(){
   async function live(question:string):Promise<LocalReply>{
     const r=await ask(question);
     const href:CoachAction['href']=r.intent==='cook'||r.intent==='food'?'/pantry':'/utilities';
-    const extra=r.actions?.length?'\n\n'+r.actions.slice(0,3).map((a,i)=>`${i+1}. ${a.title}${a.estimated_savings_mur?` (about ${money(a.estimated_savings_mur)})`:''}`).join('\n'):'';
-    return {text:r.answer+extra,action:{label:href==='/pantry'?'Check pantry & recipes':'View utility insights',href}};
+    return {text:r.answer,action:{label:href==='/pantry'?'Check pantry & recipes':'View utility insights',href}};
   }
   const [data,setData]=useState<Insight|null>(null);
   const [loading,setLoading]=useState(true);

@@ -125,9 +125,13 @@ def explain_forecast(kind, use_ai=True):
                               f"{'CWA' if kind == 'water' else 'CEB'} tariff"})
     factors.append({"label": "Period", "value": f"{f.get('period_start')} to {f.get('period_end')}",
                     "detail": "your next billing cycle"})
-    n_bills = len(f.get("source_data") or [])
+    if kind == "water":
+        from water import store as _st
+    else:
+        from electricity import store as _st
+    n_bills = len([b for b in _st.load().get("bills", []) if b.get("source") != "placeholder"])
     factors.append({"label": "Based on", "value": f"{n_bills} confirmed bill{'s' if n_bills != 1 else ''}",
-                    "detail": f.get("status_message") or (f.get("method") or "")[:160]})
+                    "detail": f.get("status_message") or "measured daily use from your bill periods"})
     rel = f.get("reliability") or {}
     if rel.get("mean_abs_error_pct") is not None:
         factors.append({"label": "Accuracy so far", "value": f"±{_fmt(rel['mean_abs_error_pct'], 1)}%",

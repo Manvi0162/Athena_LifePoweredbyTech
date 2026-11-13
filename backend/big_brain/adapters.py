@@ -155,7 +155,7 @@ def rank_all(combined, main_goal=None):
         if a["source"] == "domain_module":
             a["priority_score"], a["priority_reason"] = score(a, main_goal)
         else:
-            a["priority_reason"] = "Big Brain data-quality check (impact, urgency, confidence)"
+            a["priority_reason"] = "AI recommendation: data-quality check (impact, urgency, confidence)"
         out.append(a)
     out.sort(key=lambda a: (-a["priority_score"], -(a.get("estimated_savings_mur") or 0), a["module"], a["action_id"]))
     for i, a in enumerate(out, 1):

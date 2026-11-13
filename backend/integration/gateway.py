@@ -483,12 +483,6 @@ def demo_sample():
                     {"original_name": "Carottes", "normalized_name": "carrot", "quantity": 2, "unit": "piece", "line_total": 28},
                     {"original_name": "Petits pois 500g", "normalized_name": "peas", "quantity": 0.5, "unit": "kg", "line_total": 70},
                     {"original_name": "Oignons", "normalized_name": "onion", "quantity": 3, "unit": "piece", "line_total": 45}]}).execute()
-    carrot = (ctx.db.table("pantry_items").select("id").eq("household_id", h["id"]).eq("ingredient_name", "carrot")
-              .limit(1).execute().data or [])
-    if carrot:                                      # one expiry date, so "use soon" can be shown
-        from datetime import timedelta
-        ctx.db.table("pantry_items").update({"expiry_date": (date.today() + timedelta(days=2)).isoformat()}) \
-            .eq("id", carrot[0]["id"]).execute()
     return {"ok": True, "note": "Sample household loaded. Water bills are fictional; electricity bills are the team's "
                                 "real CEB history; the receipt is fictional."}
 

@@ -15,7 +15,7 @@ import re
 log = logging.getLogger(__name__)
 _CACHE = {}
 
-PROMPT = """You are LiveBetter Big Brain, a household assistant for Mauritius.
+PROMPT = """You are LiveBetter's AI recommendation assistant for households in Mauritius.
 Explain the following pre-ranked household actions to the household in simple English.
 
 Rules:

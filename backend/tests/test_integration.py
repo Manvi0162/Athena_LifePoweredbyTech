@@ -223,7 +223,7 @@ def test_sample_household(client):
     assert d["status"] == "success" and d["module_status"]["water"] == "data_available"
     assert d["module_details"]["water"]["status"] == "better_supported"
     ids = [a["action_id"] for a in d["actions"]]
-    assert "use_expiring_items" in ids and "cook_from_pantry" in ids and "shorter_showers_hot_water" not in ids
+    assert "cook_from_pantry" in ids and "complete_expiry_tracking" not in ids and "shorter_showers_hot_water" not in ids
     assert client.post("/demo/sample").status_code == 409                       # never overwrites real data
     assert client.post("/demo/reset").status_code == 403
     assert client.post("/demo/reset", headers=step_up(client, "reset_account")).json()["ok"]

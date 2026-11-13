@@ -112,7 +112,7 @@ def generate_action_candidates(context):
                         "title": "Review possible duplicate receipts",
                         "evidence": {"possible_duplicate_count": food["possible_duplicate_count"]},
                         "impact": 3, "urgency": 3, "confidence": 3})
-    if food["missing_expiry_count"] > 0:
+    if False and food["missing_expiry_count"] > 0:   # integration: the team removed expiry dates from the app (14 Nov)
         actions.append({"id": "complete_expiry_tracking", "module": "food",
                         "title": "Add verified pantry expiry dates",
                         "evidence": {"missing_expiry_count": food["missing_expiry_count"]},

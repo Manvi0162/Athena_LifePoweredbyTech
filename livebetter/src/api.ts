@@ -54,9 +54,10 @@ export async function request<T>(path: string, method: 'GET' | 'POST' | 'PATCH' 
   } finally { clearTimeout(timer); }
 }
 
-export async function uploadImage<T>(path: string, imageUri: string): Promise<T> {
+export async function uploadImage<T>(path: string, imageUri: string, fields?: Record<string, string>): Promise<T> {
   if (!URL) throw Error('Backend URL missing.');
   const data = new FormData();
+  for (const [k, v] of Object.entries(fields || {})) data.append(k, v);
   // The food backend reads the photo from the `image` field.
   if (Platform.OS === 'web') {
     // In a browser the picker gives a blob:/data: URL; the {uri,name,type} object only works on iOS/Android
@@ -88,6 +89,8 @@ export const routes = {
   security: '/security/status', pattern: '/security/pattern', verifyPattern: '/security/pattern/verify',
   authSetup: '/security/authenticator/setup', authConfirm: '/security/authenticator/confirm',
   authDisable: '/security/authenticator/disable', restore: '/account/restore', resetStatus: '/account/reset-status',
+  parseBill: '/bills/parse', explain: '/utilities/explain', habits: '/habits', recognize: '/food/recognize',
+  describe: '/food/describe', searchRecipes: '/recipes/search', generateRecipe: '/recipes/generate', drafts: '/recipes/drafts',
 };
 export type ParsedReceipt = {
   items: ReceiptItem[]; receipt_id?: string; status?: string; retailer?: string | null;

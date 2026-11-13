@@ -64,7 +64,7 @@ def import_shared_rows(ctx, h, module, state):
             bill.update(start_reading=r.get("start_meter_reading"), ocr_id=None)
         else:
             code = str(r.get("tariff_code") or "")
-            bill["tariff_class"] = next((c for c in ("110", "140", "150", "155", "160") if c in code), None)
+            bill["tariff_class"] = next((c for c in ("110", "120", "140") if c in code), None)
         state["bills"].append(bill)
     state["bills"].sort(key=lambda b: b["start"])
     last_end = max((b["end"] for b in state["bills"]), default="")

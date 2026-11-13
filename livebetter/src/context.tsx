@@ -1,6 +1,7 @@
 import React,{createContext,useCallback,useContext,useEffect,useMemo,useState} from 'react';
 import {ApiError,DEMO_MODE,ParsedReceipt,categoryParams,clearSession,getSession,loadSession,newOperationId,request,routes,saveSession,uploadImage} from './api';
 import {getRecipes,loadDemo,mockForecast,mockInsights,mockScenario,putBill,putCooking,putHousehold,putPantry,putReceipt,resetDemo,saveDemo} from './mock';
+import {AIRecipe,Explanation,Habits,ParsedBill,RecipeMatch,RecognisedItem} from './types';
 import {Activity,AuthenticatorSetup,Bill,CoachReply,Forecast,Household,Insight,LoginResult,PantryItem,ReceiptItem,Recipe,ResetStatus,Scenario,SecurityStatus,SensitiveAction,Snapshot,UtilityKind} from './types';
 
 type Context={
@@ -21,6 +22,16 @@ type Context={
   authenticatorDisable:(proof:{code?:string;recovery_code?:string},stepUp:string)=>Promise<SecurityStatus>;
   resetAccount:(stepUp:string)=>Promise<string>; restoreAccount:(stepUp:string)=>Promise<string>;
   resetStatus:()=>Promise<ResetStatus>;
+  // redesign: bill photo, explainable AI, habits, scan-to-cook
+  parseBill:(kind:UtilityKind,uri:string)=>Promise<ParsedBill>;
+  explain:(kind:UtilityKind)=>Promise<Explanation>;
+  habits:(kind:UtilityKind)=>Promise<Habits>;
+  saveHabits:(kind:UtilityKind,answers:Record<string,any>)=>Promise<Habits>;
+  recognizeFood:(uri:string)=>Promise<{items:RecognisedItem[];message:string}>;
+  describeFood:(item:RecognisedItem)=>Promise<string>;
+  searchRecipes:(ingredients:string[])=>Promise<RecipeMatch[]>;
+  generateRecipe:(ingredients:string[])=>Promise<AIRecipe>;
+  saveRecipe:(recipe:AIRecipe['recipe'])=>Promise<string>;
   addBill:(v:Omit<Bill,'id'|'household_id'|'currency'>)=>Promise<void>;
   addItem:(v:Omit<PantryItem,'id'> & {id?:string})=>Promise<void>;
   confirmReceipt:(items:ReceiptItem[],receiptId?:string)=>Promise<void>;
@@ -42,11 +53,13 @@ type ApiPantry={id:string;ingredient_name:string;quantity:number;unit:string;exp
 const toPantry=(p:ApiPantry):PantryItem=>({id:p.id,name:p.ingredient_name,quantity:Number(p.quantity),unit:p.unit,
   expiry:p.expiry_date||undefined,available:p.available});
 type ApiRecipe={id:string;name:string;ingredients:{name:string;quantity:number|null;unit:string|null;optional?:boolean}[];
-  missing:string[];uncertain?:string[];coverage:number;cook_now:boolean;instructions:string;source:string};
+  missing:string[];uncertain?:string[];coverage:number;cook_now:boolean;instructions:string;source:string;
+  steps?:string[];verification_status?:string|null};
 const toRecipe=(r:ApiRecipe):Recipe=>({id:r.id,name:r.name,
   ingredients:r.ingredients.filter(i=>!i.optional).map(i=>({name:i.name,quantity:Number(i.quantity||0),unit:i.unit||''})),
   missing:[...r.missing,...(r.uncertain||[]).map(x=>`${x} (check quantity)`)],coverage:r.coverage,
-  instructions:r.instructions,source:r.source,cook_now:r.cook_now});
+  instructions:r.instructions,source:r.source,cook_now:r.cook_now,steps:r.steps,
+  verification_status:r.verification_status,ai_generated:r.verification_status==='pending'});
 
 export function AppProvider({children}:{children:React.ReactNode}){
   const [state,setState]=useState<Snapshot>(empty);const [ready,setReady]=useState(false);
@@ -231,10 +244,28 @@ export function AppProvider({children}:{children:React.ReactNode}){
     await execute(async()=>{message=(await request<{message:string}>(routes.restore,'POST',undefined,stepUp)).message;await loadLive();});
     return message;};
   const resetStatus=useCallback(async()=>{live();return request<ResetStatus>(routes.resetStatus);},[]);
+
+  // ---- redesign: every screen below calls a backend route ----
+  const parseBill=async(kind:UtilityKind,uri:string)=>{live();return uploadImage<ParsedBill>(routes.parseBill,uri,{kind});};
+  const explain=useCallback(async(kind:UtilityKind)=>{live();return request<Explanation>(`${routes.explain}?category=${kind}`);},[]);
+  const habits=useCallback(async(kind:UtilityKind)=>{live();return request<Habits>(`${routes.habits}/${kind}`);},[]);
+  const saveHabits=async(kind:UtilityKind,answers:Record<string,any>)=>{live();let out:Habits|null=null;
+    await execute(async()=>{out=await request<Habits>(`${routes.habits}/${kind}`,'PUT',answers);await loadLive();});
+    return out as unknown as Habits;};
+  const recognizeFood=async(uri:string)=>{live();return uploadImage<{items:RecognisedItem[];message:string}>(routes.recognize,uri);};
+  const describeFood=async(item:RecognisedItem)=>{live();
+    return (await request<{description:string}>(routes.describe,'POST',{name:item.name,category:item.category,label_text:item.label_text})).description;};
+  const searchRecipes=async(ingredients:string[])=>{live();
+    return (await request<{matches:RecipeMatch[]}>(routes.searchRecipes,'POST',{ingredients})).matches;};
+  const generateRecipe=async(ingredients:string[])=>{live();return request<AIRecipe>(routes.generateRecipe,'POST',{ingredients});};
+  const saveRecipe=async(recipe:AIRecipe['recipe'])=>{live();let id='';
+    await execute(async()=>{id=(await request<{recipe_id:string}>(routes.drafts,'POST',{recipe})).recipe_id;});
+    return id;};
   const value=useMemo(()=>({ready,busy,demo:DEMO_MODE,state,error,signedIn,clearError:()=>setError(null),clearDemo,
     login,loginCode,signup,logout,loadSample,refreshAll,onboard,deleteBill,addBill,addItem,confirmReceipt,parseReceipt,forecast,
     insights,recipes,cook,scenario,ask,refreshPantry,securityStatus,setPattern,verifyPattern,authenticatorSetup,
-    authenticatorConfirm,authenticatorDisable,resetAccount,restoreAccount,resetStatus}),
+    authenticatorConfirm,authenticatorDisable,resetAccount,restoreAccount,resetStatus,parseBill,explain,habits,saveHabits,
+    recognizeFood,describeFood,searchRecipes,generateRecipe,saveRecipe}),
     // Event handlers bind the latest state each render.
     [ready,busy,state,error,signedIn]);
   // Screens mount only after the saved login is loaded, so their first requests carry the token.

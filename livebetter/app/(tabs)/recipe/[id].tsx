@@ -23,21 +23,21 @@ export default function RecipeDetail(){
     return()=>{active=false;};
   },[id,recipes]);
 
-  function confirm(){
-    if(!recipe)return;
-    if(recipe.missing.length)return Alert.alert('Missing ingredients',`Add or correct: ${recipe.missing.join(', ')}`);
-    setConfirming(true);
-  }
+  function confirm(){if(recipe)setConfirming(true);}
   async function saveCooking(){
     if(!recipe)return;
     try{
-      await cook(recipe.id,`cook-${Date.now()}-${Math.random()}`);
+      await cook(recipe.id,'new');
       router.replace('/pantry-updated');
     }catch(error){Alert.alert('Could not update pantry',String(error));}
   }
 
   return <Page back title={recipe?.name||'Recipe details'} subtitle="A recipe from the ingredients you have available.">
     {loading?<ActivityIndicator color={C.green}/>:recipe?<>
+      {recipe.ai_generated?<View style={{backgroundColor:C.amber,borderRadius:12,padding:11}}>
+        <Text style={[S.title,{color:'#8A5A00'}]}>⚠ AI-generated recipe</Text>
+        <Text style={[S.muted,{color:'#8A5A00'}]}>Not checked by a cook. Check ingredients, allergies and cooking times.</Text>
+      </View>:null}
       <View style={[S.heroCard,{backgroundColor:'#A8904F',alignItems:'center',paddingVertical:28}]}>
         <Text style={{fontSize:42}}>🍲</Text>
         <Text style={S.heroEyebrow}>{Math.round(recipe.coverage*100)}% INGREDIENTS AVAILABLE</Text>
@@ -55,7 +55,8 @@ export default function RecipeDetail(){
       </Card>
       <Card>
         <Label>How to make it</Label>
-        <Text style={S.body}>{recipe.instructions}</Text>
+        {recipe.steps&&recipe.steps.length>1?recipe.steps.map((t,k)=><Text key={k} style={S.body}>{k+1}. {t}</Text>):
+          <Text style={S.body}>{recipe.instructions}</Text>}
         <Note>Source: {recipe.source}</Note>
       </Card>
       <Card>
@@ -63,10 +64,10 @@ export default function RecipeDetail(){
         {confirming?<View style={{gap:9,backgroundColor:C.softGreen,borderRadius:14,padding:13}}>
           <Label>Confirm the meal</Label>
           <Note>Deduct these ingredients from your pantry? This does not add a new grocery expense.</Note>
+          {recipe.missing.length?<Note>Not in your pantry, so nothing is deducted for: {recipe.missing.join(', ')}.</Note>:null}
           <Btn title="Confirm and update pantry  →" onPress={()=>void saveCooking()}/>
           <Btn title="Cancel" outline onPress={()=>setConfirming(false)}/>
-        </View>:<Btn title={recipe.missing.length?'Add missing ingredients first':'I cooked this meal  ✓'}
-          disabled={recipe.missing.length>0} onPress={confirm}/>}
+        </View>:<Btn title="I cooked this meal  ✓" onPress={confirm}/>}
         <Btn title="Cancel" outline onPress={()=>router.back()}/>
       </Card>
     </>:<Card><Label>Recipe not found</Label><Note>It may have changed or is no longer available.</Note>

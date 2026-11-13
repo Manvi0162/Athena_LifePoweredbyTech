@@ -66,18 +66,5 @@ export default function Settings(){
       <Btn title="Reset demo data" outline onPress={()=>void app.clearDemo()}/>
     </Card>}
 
-    <Card>
-      <Label>Language</Label>
-      <View style={[S.between,{paddingVertical:11,borderBottomWidth:1,borderBottomColor:C.line}]}>
-        <Text style={S.body}>English</Text><Text style={{color:C.green,fontWeight:'800'}}>ACTIVE</Text>
-      </View>
-      <Text style={S.body}>Français · Kreol Morisien</Text>
-      <Note>Additional language translations are not enabled in this app build.</Note>
-    </Card>
-    <Card>
-      <Label>History and activity</Label>
-      <ActionRow icon="◷" title="Household activity" subtitle="Bills, receipts, pantry and security events"
-        onPress={()=>router.push('/activity')}/>
-    </Card>
   </Page>;
 }

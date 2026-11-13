@@ -60,6 +60,30 @@ Open http://127.0.0.1:8000/docs. `GET /info` says which mode is running:
 Only the publishable key is used; the user's own token is attached to every query, so row-level security
 and the SQL functions decide what each user can see. Secrets stay in `backend/.env`, never in the app.
 
+## Run with the team's Supabase database (step by step)
+1. **Database (once, Supabase → SQL Editor).** The database owner's scripts (`database/` on the `database` branch:
+   food schema, `03_livebetter_integration_extension`, `04_atomic_big_brain_rpc`, demo seeds 05–07) are already run.
+   Also run these two from *this* folder (additive, safe to re-run, they do not touch existing rows):
+   `backend/sql/03_module_state.sql` (water/electricity detail per household) and
+   `backend/sql/04_user_security.sql` (pattern + authenticator). Without them water, electricity and security fail.
+2. **`backend/.env`:**
+   ```
+   SUPABASE_URL=https://<project>.supabase.co
+   SUPABASE_PUBLISHABLE_KEY=sb_publishable_...      # the backend uses ONLY this key
+   GEMINI_API_KEY=...                               # receipts, bill photos, food scan, AI text
+   LIVEBETTER_SECRET=<long random text>
+   MFA_ENCRYPTION_KEY=<Fernet key, see .env.example>
+   ```
+   `SUPABASE_SECRET_KEY` is not read by any code; you can delete that line. Never put it in the app or in git.
+3. **Remove the local test data:** stop the backend and delete the folder `backend/.localdata` (local accounts,
+   local households). With Supabase keys set it is not used anyway.
+4. Start the backend and open `http://127.0.0.1:8000/info`: it must say `"mode": "supabase"`.
+5. In the app, **log in with the Supabase user** (the email the demo seed was run for). That user's newest household
+   (e.g. "LiveBetter Full Demo - Seed 06") is used. Its `utility_bills` and `meter_readings` rows are read into the
+   water and electricity modules automatically, so forecasts appear without re-typing bills.
+6. New accounts: **Register** in the app (Supabase Auth). If email confirmation is on in Supabase, confirm the email
+   first, then log in.
+
 ## Connect the app
 In `livebetter/.env.local`:
 ```
@@ -79,7 +103,8 @@ Settings → **Load sample household** fills a clearly labelled sample for rehea
 | App | `GET/POST /bills`, `DELETE /bills/{kind}/{id}`, `GET /utilities/forecast?category=` | → water / electricity |
 | App | `POST /household/scenarios` (`{category, reduction_percent}` or `{category, scenario, params}`) | → water / electricity |
 | Big Brain | `GET /household/dashboard` (report format), `GET /household/insights` (app format + v3 summary), `GET /big-brain/dashboard` (v3), `POST /household/coach` | Manvi |
-| App | `GET /activity`, `POST /demo/sample` (only on an empty account), `POST /demo/reset` (= `/account/reset`) | integration |
+| App | `GET /activity` (each row has a `category`: ai, water, electricity, groceries, security, household), `POST /demo/sample` (only on an empty account), `POST /demo/reset` (= `/account/reset`) | integration |
+| App (14 Nov) | `POST /bills/parse` (bill photo → form values), `GET /utilities/explain?category=` (explainable AI), `GET/PUT /habits/{water,electricity}`, `POST /food/describe`, `POST /recipes/generate` | integration (`integration/extras.py`) |
 | Water | `/water/*`: assessment W1–W5, bills, readings, forecast, current cycle, checks, scenarios, goals, seasons, summary | Sanjana |
 | Electricity | `/electricity/*`: assessment E1–E5, bills, readings, forecast, forecast checks, scenarios, goals, summary | Alexandra |
 | Food | `GET /pantry`, `POST /pantry`, `PATCH /pantry`, `POST /receipts/parse`, `POST /receipts/confirm`, `GET /recipes`, `GET /recipes/ranked`, `POST /recipes/search`, `POST /recipes/recommend`, `POST /recipes/drafts`, `POST /recipes/{id}/cook`, `POST /food/recognize`, `GET /household` | Shruti |
@@ -137,8 +162,8 @@ notebook's sample files), Gemini output passes the same number check, and a temp
 ```
 python -m pytest -q tests water/tests electricity/tests
 ```
-115 tests: food (Shruti, 42 + 1 needing local PostgreSQL), water (36), electricity (18), end-to-end (13),
-security / misuse (6).
+119 tests: food (Shruti, 42 + 1 needing local PostgreSQL), water (36), electricity (18), end-to-end (13),
+security / misuse (6), app features (4).
 
 ## Credits and AI disclosure
 Food API: Shruti · Water engine: Sanjana · Electricity engine: Alexandra · Big Brain: Manvi · App: Kentish.

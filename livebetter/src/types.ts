@@ -20,8 +20,11 @@ export type Forecast = { category: UtilityKind; period_start: string | null; per
 export type PantryItem = { id: string; name: string; quantity: number; unit: string; expiry?: string; available: boolean };
 export type ReceiptItem = { name: string; quantity: number; unit: string; price: number; original_name?: string; category?: string };
 export type Recipe = { id: string; name: string; ingredients: { name: string; quantity: number; unit: string }[];
-  missing: string[]; coverage: number; instructions: string; source: string; cook_now?: boolean };
-export type Activity = { id: string; at: string; message: string; kind: string };
+  missing: string[]; coverage: number; instructions: string; source: string; cook_now?: boolean;
+  steps?: string[]; ai_generated?: boolean; verification_status?: string | null };
+export type ActivityCategory = 'ai' | 'water' | 'electricity' | 'groceries' | 'security' | 'household';
+export type Activity = { id: string; at: string; message: string; kind: string; category?: ActivityCategory;
+  event_type?: string; details?: Record<string, unknown> };
 export type BigBrainAction = { source: string; module: string; action_id: string; title: string; rank?: number;
   priority_score: number | null; estimated_savings_mur: number | null; confidence?: string; kind?: string;
   evidence: Record<string, unknown>; assumptions?: Record<string, unknown>; explanation?: string | null;
@@ -53,3 +56,21 @@ export type SecurityStatus = { pattern_set: boolean; pattern_set_at?: string | n
 export type AuthenticatorSetup = { otpauth_uri: string; qr_png: string; manual_key: string; note: string };
 export type ResetStatus = { restorable: boolean; reset_at?: string; restore_until?: string };
 export type LoginResult = { household: boolean; mfa?: { token: string; message: string } };
+
+// ---- redesign (14 Nov): bill photo, explainable AI, habits, scan-to-cook ----
+export type ParsedBill = { kind: UtilityKind; period_start: string | null; period_end: string | null; units: number | null;
+  amount: number | null; start_reading: number | null; end_reading: number | null; tariff: string | null;
+  uncertain: string[]; message: string };
+export type Explanation = { category: UtilityKind; status: string; available: boolean; confidence?: string; headline: string;
+  summary: string; summary_source: string; factors: { label: string; value: string; detail: string }[];
+  breakdown: { label: string; rs: number; how: string }[]; to_improve: string[]; method?: string; assumptions: string[] };
+export type HabitQuestion = { id: string; question: string; multi: boolean; options: { value: string; label: string }[];
+  extra?: { id: string; label: string } };
+export type Habits = { kind: UtilityKind; questions: HabitQuestion[]; answers: Record<string, any>; note: string };
+export type RecognisedItem = { name: string; category: 'fresh' | 'packaged' | 'unknown'; confidence: number;
+  label_text: string[]; low_confidence: boolean };
+export type RecipeMatch = { recipe_id: string; name: string; verification_status?: string; uses_from_photo: string[];
+  already_in_pantry: string[]; still_to_buy: string[] };
+export type AIRecipe = { recipe: { name: string; description?: string; servings?: number; prep_minutes?: number;
+  cook_minutes?: number; ingredients: { ingredient_name: string; quantity: number | null; unit: string | null; optional?: boolean }[];
+  instructions: string[] }; missing: string[]; coverage: number; cook_now: boolean; warning: string };

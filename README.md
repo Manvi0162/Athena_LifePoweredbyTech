@@ -123,6 +123,11 @@ The app uses Expo Router. The active route URLs are:
 | `/welcome` | `app/welcome.tsx` | first entry screen |
 | `/login` | `app/login.tsx` | email + password; then the Microsoft Authenticator code if switched on |
 | `/register` | `app/register.tsx` | create an account (backend `POST /auth/signup`) |
+| `/(tabs)/bill?kind=water\|electricity` | `app/(tabs)/bill.tsx` | one form per utility; bill photo fills it in (`/bills/parse`) |
+| `/(tabs)/habits?kind=` | `app/(tabs)/habits.tsx` | water habits (W1–W5) or appliances and habits (E1–E5) only |
+| `/(tabs)/stock`, `/(tabs)/ingredients` | | groceries and stock; ingredient table |
+| `/(tabs)/cook-now` | | scan an ingredient → what it is → recipes that use it → AI recipe if none → save → cook |
+| `/(tabs)/activity`, `/(tabs)/activity-detail?category=` | | Activity tab: sections; timeline with dates and PDF export |
 | `/security` | `app/security.tsx` | security pattern + optional Microsoft Authenticator (after registration and from Settings) |
 | `/onboarding` | `app/onboarding.tsx` | household setup flow |
 | `/(tabs)/home` | `app/(tabs)/home.tsx` | main dashboard |
@@ -192,6 +197,19 @@ The app uses `DEMO_MODE = process.env.EXPO_PUBLIC_USE_MOCKS !== 'false'` in `src
 
 ### UI shell
 `src/ui.tsx` provides the shared screen layout and tab navigation. Most pages use the generic `Page` component with common cards, buttons, and form fields.
+
+## App structure after the 14 Nov redesign
+Tabs: **Home · Utilities · Pantry · Coach · Activity**. Every element has a backend route behind it; features without
+one were removed (language switch, manual pantry edit, expiry dates, "try one change").
+- **Home:** Add a bill / Scan a receipt, utility baseline, Groceries (one card), Needs attention (security, missing
+  bills, AI recommendations that matter now).
+- **Utilities → Water / Electricity:** next billing cycle → *Why this estimate* (explainable AI: factors, bill
+  calculation, what would make it more accurate) → past bills (✕ to delete, pattern needed) → habits (edit opens only
+  that module's questions).
+- **Pantry:** *Groceries and stock* (scan receipt, ingredient table) and *Cook with something now* (scan → description
+  → recipes from the database that use it → AI recipe, labelled AI-generated, can be saved → cook → stock goes down).
+- **Activity:** AI recommendations, Water, Electricity, Groceries and pantry, Security; each opens a timeline with
+  date filter and PDF export (Kentish's export).
 
 ## Surprise card: Misuse
 

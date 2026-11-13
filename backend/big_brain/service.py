@@ -103,7 +103,7 @@ def build_dashboard(ctx, household, use_ai=True):
         "water": {k: wsum.get(k) for k in ("status", "status_message", "data_completeness", "reliability",
                                             "forecast_vs_actual", "context")},
         "electricity": {k: esum.get(k) for k in ("forecast_status", "data_completeness", "benchmark", "budget")}}
-    dash["method"] = ("Each module calculates its own forecast and savings; Big Brain validates the inputs, ranks every "
+    dash["method"] = ("Each module calculates its own forecast and savings; the AI recommendation engine validates the inputs, ranks every "
                       "action with 0.40 impact + 0.35 urgency + 0.25 confidence (+ your main goal), and Gemini only "
                       "phrases the explanations (numbers checked).")
     return dash

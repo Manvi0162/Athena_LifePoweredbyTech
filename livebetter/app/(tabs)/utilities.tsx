@@ -44,11 +44,11 @@ export default function Utilities(){
 
     <Card>
       <Label>Improve your baseline</Label>
-      <ActionRow icon="＋" title="Add a water bill" subtitle="Record a verified billing period"
+      <ActionRow icon="＋" title="Add a water bill" subtitle="Photo or typed values from your CWA bill"
         onPress={()=>router.push({pathname:'/bill',params:{kind:'water'}})}/>
-      <ActionRow icon="＋" title="Add an electricity bill" subtitle="Record a verified billing period"
+      <ActionRow icon="＋" title="Add an electricity bill" subtitle="Photo or typed values from your CEB bill"
         onPress={()=>router.push({pathname:'/bill',params:{kind:'electricity'}})}/>
-      <Note>Bill photos are previewed locally. Enter and confirm the values printed on your bill.</Note>
+      <Note>Upload a photo of the bill and the form is filled in for you to check.</Note>
     </Card>
     <Note>{demo?'Tariff classes and future bill amounts are not verified by this demo. Avoid treating estimates as live meter data.':
       'Costs are calculated with the official CWA and CEB tariffs. Estimates are not live meter data.'}</Note>
