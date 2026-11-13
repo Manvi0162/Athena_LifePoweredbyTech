@@ -135,8 +135,22 @@ def read_token(token):
 def load_security(user_id, db=None, mode="local"):
     if mode == "local":
         return (_load()["users"].get(user_id) or {}).get("security") or {}
-    rows = db.table("user_security").select("data").eq("user_id", user_id).limit(1).execute().data or []
+    try:
+        rows = db.table("user_security").select("data").eq("user_id", user_id).limit(1).execute().data or []
+    except Exception as exc:
+        _missing_table(exc, "user_security", "04_user_security.sql")
     return rows[0]["data"] if rows else {}
+
+
+class SetupNeeded(RuntimeError):
+    """A table from backend/sql/ has not been created in Supabase yet."""
+
+
+def _missing_table(exc, table, script):
+    if "PGRST205" in str(exc) or table in str(exc):
+        raise SetupNeeded(f"Database setup missing: run backend/sql/{script} in the Supabase SQL Editor "
+                          f"(table '{table}' not found).") from exc
+    raise exc
 
 
 def save_security(user_id, sec, db=None, mode="local"):
@@ -146,5 +160,8 @@ def save_security(user_id, sec, db=None, mode="local"):
             data["users"][user_id]["security"] = sec
             _save(data)
         return
-    db.table("user_security").upsert({"user_id": user_id, "data": sec, "updated_at": _now()},
-                                     on_conflict="user_id").execute()
+    try:
+        db.table("user_security").upsert({"user_id": user_id, "data": sec, "updated_at": _now()},
+                                         on_conflict="user_id").execute()
+    except Exception as exc:
+        _missing_table(exc, "user_security", "04_user_security.sql")

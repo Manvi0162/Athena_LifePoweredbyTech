@@ -32,8 +32,12 @@ def load_module_state(module, template):
     ctx, h = current()
     if not h:
         return None
-    rows = (ctx.db.table("module_state").select("state").eq("household_id", h["id"]).eq("module", module)
-            .limit(1).execute().data or [])
+    try:
+        rows = (ctx.db.table("module_state").select("state").eq("household_id", h["id"]).eq("module", module)
+                .limit(1).execute().data or [])
+    except Exception as exc:
+        from .accounts import _missing_table
+        _missing_table(exc, "module_state", "03_module_state.sql")
     state = rows[0]["state"] if rows else template()
     try:
         import_shared_rows(ctx, h, module, state)

@@ -24,6 +24,7 @@ from fastapi.responses import JSONResponse  # noqa: E402
 from core.identity import IdentityMiddleware, mode  # noqa: E402
 from core.identity import router as auth_router  # noqa: E402
 from core.security import SecurityError  # noqa: E402
+from core.accounts import SetupNeeded  # noqa: E402
 from electricity.api import router as electricity_router  # noqa: E402
 from food_recognition import food_router  # noqa: E402
 from integration.gateway import router as app_router  # noqa: E402
@@ -39,6 +40,12 @@ app = FastAPI(title="LiveBetter API", version="1.0")
 # Allows the Expo web preview to call the API. Auth is by bearer token, not cookies.
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 app.add_middleware(IdentityMiddleware)
+
+
+@app.exception_handler(SetupNeeded)
+def setup_needed(_: Request, exc: SetupNeeded):
+    return JSONResponse(status_code=503, content={"detail": {"code": "database_setup_missing", "message": str(exc),
+                                                             "details": {}}})
 
 
 @app.exception_handler(SecurityError)

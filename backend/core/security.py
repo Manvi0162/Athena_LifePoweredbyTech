@@ -17,6 +17,7 @@ SAFEGUARDS (all checked on the server, so the app cannot be bypassed):
   (6. Reset is undoable for 24 hours: integration/account.py.)
 """
 import base64
+import logging
 import hashlib
 import hmac
 import json
@@ -27,6 +28,7 @@ from datetime import datetime, timedelta, timezone
 
 from . import accounts
 
+log = logging.getLogger(__name__)
 SENSITIVE = {"reset_account": "reset the account", "restore_account": "restore the account",
              "delete_bill": "delete or change a bill", "edit_household": "change the household details",
              "security_off": "switch security off"}
@@ -337,7 +339,11 @@ def totp_disable(ctx, code, step_up_token, recovery_code=None):
 
 
 def login_needs_code(user_id, db, mode):
-    return bool((accounts.load_security(user_id, db, mode).get("totp") or {}).get("enabled"))
+    try:
+        return bool((accounts.load_security(user_id, db, mode).get("totp") or {}).get("enabled"))
+    except accounts.SetupNeeded as exc:              # security table not created yet: login still works
+        log.warning("%s", exc)
+        return False
 
 
 def status(ctx):
