@@ -28,7 +28,12 @@ A final `backend/main.py` can include all routers in one app.
 ```json
 {
   "module": "water",                       // "water" | "electricity" | "food"
-  "status": "ok",                          // or "no_data" with "message"
+  "status": "preliminary",                 // insufficient_data | preliminary | better_supported
+  "status_message": "This is an early estimate based on one billing period. Your future usage may differ.",
+  "data_completeness": { "pct": 64, "missing": [ { "item": "W1_shower_minutes", "prompt": "Answer: ..." } ] },
+  "reliability": { "checked_forecasts": 1, "backtests": 2, "mean_abs_error_pct": 3.6 },
+  "forecast_vs_actual": [ { "kind": "real|backtest", "predicted_m3": 22.7, "actual_m3": 24.0, "error_pct": -5.3 } ],
+  "unlock": [ { "scenario": "shorter_showers", "missing": [ { "item": "W1_shower_minutes", "prompt": "..." } ] } ],
   "currency": "MUR",
   "period_start": "2026-11-12", "period_end": "2026-12-12",
   "forecast": {
@@ -55,6 +60,8 @@ A final `backend/main.py` can include all routers in one app.
 }
 ```
 Rules
+- No measured usage → `status: "insufficient_data"`, `forecast: null` (never a made-up number).
+- Completeness (what the user told us) and reliability (how past estimates matched real bills) are separate.
 - `cost_rs` is always Mauritian rupees for the module's current period, so the AI can add modules up.
 - Every recommendation has `evidence` (period, data, method, assumptions). No number without a reason.
 - Synthetic or placeholder data must be said in `forecast.method` / `evidence.assumptions`.

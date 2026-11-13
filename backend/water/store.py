@@ -1,7 +1,8 @@
 """Water module storage: one JSON file for now (single household account).
 
 Kept behind load / save / reset / log so it can be swapped for Supabase tables
-(water_profile, water_bills, water_readings, water_actions, water_activity) without touching the maths.
+(households, water_assessments, water_bills, water_readings, water_actions,
+water_forecasts, water_checks, water_activity) without touching the maths.
 """
 import copy
 import json
@@ -11,14 +12,15 @@ from datetime import datetime, timezone
 
 HERE = os.path.dirname(__file__)
 PATH = os.environ.get("WATER_STATE_FILE", os.path.join(HERE, "data", "water_state.json"))
-DEMO = os.path.join(HERE, "data", "demo_water.json")
+EMPTY = os.path.join(HERE, "data", "empty_water.json")
+SAMPLE = os.path.join(HERE, "data", "sample_water.json")
 _lock = threading.Lock()
 
 
 def load():
     with _lock:
         if not os.path.exists(PATH):
-            _write(_demo())
+            _write(_read(EMPTY))
         with open(PATH, encoding="utf-8") as fh:
             return json.load(fh)
 
@@ -28,15 +30,16 @@ def save(state):
         _write(state)
 
 
-def reset():
+def reset(sample=False):
+    """Empty account (default) or the fictional sample household."""
     with _lock:
-        state = _demo()
+        state = _read(SAMPLE if sample else EMPTY)
         _write(state)
         return copy.deepcopy(state)
 
 
-def _demo():
-    with open(DEMO, encoding="utf-8") as fh:
+def _read(path):
+    with open(path, encoding="utf-8") as fh:
         return json.load(fh)
 
 
