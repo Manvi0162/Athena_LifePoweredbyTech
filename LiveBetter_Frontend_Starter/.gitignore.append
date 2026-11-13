@@ -1,0 +1,4 @@
+# Add to your Expo scaffold's .gitignore (verify this is present):
+.env.local
+.env.*.local
+*.apk

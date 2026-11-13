@@ -1,0 +1,21 @@
+{
+  "expo": {
+    "name": "LiveBetter",
+    "slug": "livebetter-hackathon",
+    "scheme": "livebetter",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "ios": {"supportsTablet": true},
+    "android": {
+      "package": "com.livebetter.hackathon2026",
+      "permissions": ["CAMERA"]
+    },
+    "plugins": [
+      "expo-router",
+      ["expo-image-picker", {"cameraPermission": "LiveBetter uses the camera to photograph receipts and bills."}]
+    ],
+    "experiments": {"typedRoutes": true}
+  }
+}

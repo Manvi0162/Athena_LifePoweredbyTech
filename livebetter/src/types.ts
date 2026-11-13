@@ -1,0 +1,27 @@
+export type UtilityKind = 'water' | 'electricity';
+export type Confidence = 'limited_history' | 'historical_baseline' | 'measured' | 'unavailable';
+export type Household = {
+  id: string; name: string; members: number; home_type: string;
+  water_tariff: string; electricity_tariff: string;
+  monthly_target: number; diet: string; allergies: string;
+  water_habit: string; appliance_notes: string;
+};
+export type Bill = { id: string; household_id: string; kind: UtilityKind; period_start: string; period_end: string;
+  units: number; amount: number; tariff: string; currency: 'MUR' };
+export type Forecast = { category: UtilityKind; period_start: string; period_end: string; units: number;
+  unit: string; value: number | null; currency: 'MUR'; method: string;
+  confidence: Confidence; assumptions: string[]; source_data: string[] };
+export type PantryItem = { id: string; name: string; quantity: number; unit: string; expiry?: string; available: boolean };
+export type ReceiptItem = { name: string; quantity: number; unit: string; price: number };
+export type Recipe = { id: string; name: string; ingredients: { name: string; quantity: number; unit: string }[];
+  missing: string[]; coverage: number; instructions: string; source: string };
+export type Activity = { id: string; at: string; message: string; kind: string };
+export type Insight = { period_start: string; period_end: string; currency: 'MUR';
+  water: number | null; electricity: number | null; groceries_recorded: number;
+  total: number | null; assumptions: string[]; recommendations: string[]; method: string;
+  source_data: string[] };
+export type Scenario = { baseline: number | null; adjusted: number | null; delta: number | null;
+  unit_change: number | null; message: string; assumptions: string[] };
+export type Snapshot = { household: Household | null; bills: Bill[]; pantry: PantryItem[];
+  receipts: { id: string; at: string; total: number }[];
+  activity: Activity[]; completed_actions: string[] };
