@@ -32,7 +32,7 @@ This folder contains Expo Router screens. Each file is a route/page in the app.
 - `app/(tabs)/recipe/[id].tsx` — recipe detail and cook confirmation
 - `app/(tabs)/pantry-updated.tsx` — success screen after a cook action
 - `app/(tabs)/coach.tsx` — AI coach chat assistant
-- `app/(tabs)/activity.tsx` — household activity log
+- `app/(tabs)/activity.tsx` — household activity log and date-range PDF export
 - `app/(tabs)/settings.tsx` — settings page
 
 ### `src/`
@@ -61,7 +61,7 @@ The app uses Expo Router. The main routes are:
 
 | URL | File | Purpose |
 |---|---|---|
-| `/` | `app/index.tsx` | root redirect |
+| `/` | `app/index.tsx` | redirects to welcome |
 | `/welcome` | `app/welcome.tsx` | welcome screen |
 | `/login` | `app/login.tsx` | login UI placeholder |
 | `/register` | `app/register.tsx` | registration UI placeholder |
@@ -83,14 +83,13 @@ The app uses Expo Router. The main routes are:
 
 ```text
 / -> index.tsx
-   -> if household exists: /(tabs)/home
-   -> otherwise: /welcome
+   -> /welcome
 
 /welcome
    -> /login or /register
 
-/login or /register
-   -> /onboarding
+/register
+   -> account details form (authentication integration pending)
 
 /onboarding
    -> save household details
@@ -111,6 +110,10 @@ The app uses Expo Router. The main routes are:
    -> /(tabs)/receipt
    -> /(tabs)/recipe/[id]
    -> /(tabs)/activity
+
+/(tabs)/activity
+   -> filter history by inclusive start/end dates
+   -> export matching entries as a PDF (browser print/save on web; share PDF on mobile)
 
 /(tabs)/coach
    -> AI coach suggestions, scenarios, and utility guidance

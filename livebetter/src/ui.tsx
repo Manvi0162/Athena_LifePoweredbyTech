@@ -4,7 +4,7 @@ import {router,usePathname} from 'expo-router';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {C,S} from './theme';
 import {useApp} from './context';
-export function Page({title,subtitle,children,back=true,showSettings,stickyFooter,showTabs=true}:{title:string;subtitle?:string;children:React.ReactNode;back?:boolean;showSettings?:boolean;stickyFooter?:React.ReactNode;showTabs?:boolean}){
+export function Page({title,subtitle,children,back=true,showSettings,stickyFooter,showTabs=true,hideBrand=false,headerRight}:{title:string;subtitle?:string;children:React.ReactNode;back?:boolean;showSettings?:boolean;stickyFooter?:React.ReactNode;showTabs?:boolean;hideBrand?:boolean;headerRight?:React.ReactNode}){
   const {error,clearError}=useApp();
   const [keyboardVisible,setKeyboardVisible]=useState(false);
   useEffect(()=>{
@@ -17,15 +17,21 @@ export function Page({title,subtitle,children,back=true,showSettings,stickyFoote
     <ScrollView style={S.screen} contentContainerStyle={S.content} keyboardShouldPersistTaps="handled"
       keyboardDismissMode={Platform.OS==='ios'?'interactive':'on-drag'} automaticallyAdjustKeyboardInsets>
       <View style={S.screenHeader}>
-        <View style={S.brandRow}>
-          {back?<Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={()=>router.canGoBack()?router.back():router.replace('/(tabs)/home')} style={S.topAction}><Text style={S.topActionText}>‹</Text></Pressable>:null}
-          <View accessibilityLabel="LiveBetter L plus logo" style={S.brandMark}>
-            <Text style={S.brandInitial}>L</Text>
-            <Text style={S.brandPlus}>+</Text>
+        {hideBrand?<>
+          {back?<Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={()=>router.canGoBack()?router.back():router.replace('/(tabs)/home')} style={S.topAction}><Text style={S.topActionText}>‹</Text></Pressable>:<View/>}
+          {headerRight}
+        </>:<>
+          <View style={S.brandRow}>
+            {back?<Pressable accessibilityRole="button" accessibilityLabel="Go back" onPress={()=>router.canGoBack()?router.back():router.replace('/(tabs)/home')} style={S.topAction}><Text style={S.topActionText}>‹</Text></Pressable>:null}
+            <View accessibilityLabel="LiveBetter L plus logo" style={S.brandMark}>
+              <Text style={S.brandInitial}>L</Text>
+              <Text style={S.brandPlus}>+</Text>
+            </View>
+            <View><Text style={S.brandName}>LIVEBETTER</Text><Text style={S.brandCaption}>HOUSEHOLD PLANNER</Text></View>
           </View>
-          <View><Text style={S.brandName}>LIVEBETTER</Text><Text style={S.brandCaption}>HOUSEHOLD PLANNER</Text></View>
-        </View>
-        {showSettings?<Pressable accessibilityRole="button" accessibilityLabel="Open settings" onPress={()=>router.push('/settings')} style={S.topAction}><Text style={S.topActionText}>⚙</Text></Pressable>:null}
+          {headerRight}
+          {showSettings?<Pressable accessibilityRole="button" accessibilityLabel="Open settings" onPress={()=>router.push('/settings')} style={S.topAction}><Text style={S.topActionText}>⚙</Text></Pressable>:null}
+        </>}
       </View>
       <Text style={S.h1}>{title}</Text>{subtitle?<Text style={S.muted}>{subtitle}</Text>:null}
       {error?<Pressable onPress={clearError}><Text style={S.error}>{error}  · Tap to dismiss</Text></Pressable>:null}
