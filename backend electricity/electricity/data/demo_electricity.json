@@ -1,0 +1,15 @@
+{
+ "note": "Demo household: REAL team CEB bills (tariff 140), personal details removed. 'Last 3 consumptions' assumed most recent first. Daily values are synthetic, calibrated to each bill.",
+ "seed": "athena-demo",
+ "today": "2026-11-13",
+ "profile": {"members": 4, "ceb_tariff": "140", "tv_licence": true, "monthly_budget_rs": 1000},
+ "bills": [
+  {"id": "ceb1", "start": "2026-05-28", "end": "2026-06-28", "kwh": 116, "end_reading": null, "source": "real bill history (CEB 'last 3 consumptions')"},
+  {"id": "ceb2", "start": "2026-06-28", "end": "2026-07-28", "kwh": 143, "end_reading": null, "source": "real bill history (CEB 'last 3 consumptions')"},
+  {"id": "ceb3", "start": "2026-07-28", "end": "2026-08-28", "kwh": 130, "end_reading": null, "source": "real bill history (CEB 'last 3 consumptions')"},
+  {"id": "ceb4", "start": "2026-08-28", "end": "2026-09-28", "kwh": 145, "end_reading": null, "source": "real CEB bill, Rs 828 consumption"}
+ ],
+ "readings": [],
+ "actions": [],
+ "activity": []
+}
