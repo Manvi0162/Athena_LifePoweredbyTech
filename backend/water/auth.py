@@ -25,6 +25,13 @@ def err(status, code, message, details=None):
 def require_login(authorization: str = Header(default="")):
     if os.environ.get("LIVEBETTER_NO_AUTH") == "1":
         return
+    try:                                   # merged backend: core/identity.py already checked the token
+        from core.identity import CURRENT, require_household
+        if CURRENT.get() is not None:
+            require_household()
+            return
+    except ImportError:
+        pass
     if not hmac.compare_digest(authorization, f"Bearer {TOKEN}"):
         err(401, "unauthorised", "Sign in first: POST /auth/login with the household email and password.")
 

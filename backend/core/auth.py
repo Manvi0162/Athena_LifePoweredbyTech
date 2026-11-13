@@ -44,6 +44,15 @@ def get_user_context(creds: HTTPAuthorizationCredentials | None = Depends(bearer
         raise _unauthorized("Log in first: send 'Authorization: Bearer <access token>'.")
     token = creds.credentials.strip()
 
+    # Merged backend: core/identity.py already checked this token once for every module
+    # (Supabase token, or the local demo account when no Supabase keys are set).
+    from .identity import CURRENT, mode
+    ctx = CURRENT.get()
+    if ctx is not None:
+        return UserContext(user_id=ctx.user_id, db=ctx.db)
+    if mode() == "local":
+        raise _unauthorized("Session expired or invalid. Log in again.")
+
     settings = get_settings()
     db = create_client(settings.supabase_url, settings.supabase_key)
     try:

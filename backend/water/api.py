@@ -18,6 +18,11 @@ from . import forecast as F
 from . import scenarios as SC
 from .auth import err, require_login
 
+try:                                   # merged backend: also write shared tables (core/sync.py)
+    from core import sync
+except ImportError:
+    sync = None
+
 router = APIRouter(prefix="/water", tags=["water"], dependencies=[Depends(require_login)])
 
 
@@ -148,6 +153,15 @@ def _save_bill(s, b: BillIn, replace_id=None):
     bill = {"id": replace_id or uuid.uuid4().hex[:8], "start": b.start.isoformat(), "end": b.end.isoformat(),
             "m3": b.m3, "amount_rs": b.amount_rs, "start_reading": b.start_reading, "end_reading": b.end_reading,
             "ocr_id": b.ocr_id, "source": "confirmed"}
+    old = next((x for x in s["bills"] if x["id"] == replace_id), None)
+    if sync:
+        if old:
+            sync.remove_bill(old.get("db_id"))
+        from .tariff import water_bill
+        amount = b.amount_rs if b.amount_rs is not None else water_bill(b.m3, s["profile"].get("sewer") or False).total
+        bill["db_id"] = sync.mirror_bill("water", bill["start"], bill["end"], b.m3, amount,
+                                         "CWA domestic" + ("" if b.amount_rs is not None else " (amount = tariff calculation)"),
+                                         bill["id"])
     s["bills"] = [x for x in s["bills"] if x["id"] != replace_id] + [bill]
     chk = F.check_against_forecast(s, bill) if not replace_id else None
     latest_end = max(x["end"] for x in s["bills"])
@@ -181,6 +195,8 @@ def delete_bill(bill_id: str):
     s = store.load()
     if not any(x["id"] == bill_id for x in s["bills"]):
         err(404, "not_found", f"No bill with id {bill_id}")
+    if sync:
+        sync.remove_bill(next(x for x in s["bills"] if x["id"] == bill_id).get("db_id"))
     s["bills"] = [x for x in s["bills"] if x["id"] != bill_id]
     store.log(s, "bill_deleted", id=bill_id)
     store.save(s)
@@ -217,6 +233,8 @@ def add_reading(r: ReadingIn):
     if later and r.index_m3 > min(later):
         err(422, "validation_error", "This reading is higher than a later reading. Check the date and number.")
     reading = {"id": uuid.uuid4().hex[:8], "date": r.date.isoformat(), "index_m3": r.index_m3}
+    if sync:
+        reading["db_id"] = sync.mirror_reading("water", r.index_m3, reading["date"])
     s.setdefault("readings", []).append(reading)
     store.log(s, "reading_added", id=reading["id"], date=reading["date"], index_m3=r.index_m3)
     store.save(s)
@@ -228,6 +246,8 @@ def delete_reading(reading_id: str):
     s = store.load()
     if not any(x["id"] == reading_id for x in s.get("readings", [])):
         err(404, "not_found", f"No reading with id {reading_id}")
+    if sync:
+        sync.remove_reading(next(x for x in s["readings"] if x["id"] == reading_id).get("db_id"))
     s["readings"] = [x for x in s["readings"] if x["id"] != reading_id]
     store.log(s, "reading_deleted", id=reading_id)
     store.save(s)
@@ -321,6 +341,8 @@ def save_goal(x: ScenarioIn):
         return existing
     a = {"id": uuid.uuid4().hex[:8], "key": x.scenario, "params": x.params, "status": "selected",
          "selected_on": F.today(s).isoformat()}
+    if sync:
+        a["db_id"] = sync.mirror_action("water", x.scenario, x.params, "selected")
     s.setdefault("actions", []).append(a)
     store.log(s, "scenario_saved_as_goal", id=a["id"], scenario=x.scenario)
     store.save(s)
@@ -335,6 +357,8 @@ def complete_action(action_id: str):
         err(404, "not_found", f"No action with id {action_id}")
     if a["status"] != "completed":                     # idempotent: completing twice changes nothing
         a["status"], a["completed_on"] = "completed", F.today(s).isoformat()
+        if sync:
+            sync.mirror_action("water", a["key"], a["params"], "completed", a.get("db_id"))
         store.log(s, "action_completed", id=action_id, scenario=a["key"])
         store.save(s)
     return {**a, "forecast": F.forecast(s)}

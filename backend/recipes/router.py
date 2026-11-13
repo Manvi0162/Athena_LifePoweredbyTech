@@ -66,6 +66,32 @@ def list_recipes(ctx: HouseholdContext = Depends(get_household_context)):
     return {"recipes": load_recipes(ctx)}
 
 
+@router.get("/ranked")
+def ranked(ctx: HouseholdContext = Depends(get_household_context)):
+    """Added at integration for the app's "Find recipes from your pantry" list: every readable recipe,
+    checked against the pantry with the notebook's evaluate_recipe(), cookable ones first."""
+    pantry = load_pantry(ctx)
+    out = []
+    for r in load_recipes(ctx):
+        a = evaluate_recipe(r, pantry)
+        steps = r.get("instructions") or []
+        out.append({
+            "id": r["id"], "name": r["name"],
+            "ingredients": [{"name": i["ingredient_name"], "quantity": i.get("quantity"), "unit": i.get("unit"),
+                             "optional": i.get("optional", False)} for i in r.get("lb_recipe_ingredients") or []],
+            "missing": a["missing"], "uncertain": a["uncertain"], "coverage": a["coverage"], "cook_now": a["cook_now"],
+            "instructions": " ".join(steps) if isinstance(steps, list) else str(steps),
+            "steps": steps if isinstance(steps, list) else [str(steps)],
+            "source": r.get("description") if r.get("cuisine") == "Demo" else
+                      f"{r.get('source_type', 'curated')} recipe ({r.get('verification_status')})"
+                      + (f" - {r['source_url']}" if r.get("source_url") else ""),
+            "verification_status": r.get("verification_status"),
+            "prep_minutes": r.get("prep_minutes"), "cook_minutes": r.get("cook_minutes"),
+            "youtube": youtube_link(r)})
+    out.sort(key=lambda x: (x["cook_now"], x["coverage"], x["verification_status"] == "verified"), reverse=True)
+    return {"recipes": out, "note": "Allergy/diet safety requires user review."}
+
+
 @router.post("/search")
 def search_by_ingredients(body: SearchBody, ctx: HouseholdContext = Depends(get_household_context)):
     """Food photo -> recipes. Send the ingredient names the user confirmed

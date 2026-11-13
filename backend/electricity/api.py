@@ -15,6 +15,11 @@ from .auth import err, require_login
 from .forecast import add_forecast_checks_for_bill, forecast, save_forecast_snapshot
 from .history import daily_history, today
 
+try:                                   # merged backend: also write shared tables (core/sync.py)
+    from core import sync
+except ImportError:
+    sync = None
+
 router = APIRouter(prefix="/electricity", tags=["electricity"], dependencies=[Depends(require_login)])
 
 
@@ -129,6 +134,12 @@ def add_bill(b: BillIn):
             "difference_rs": round(difference, 2),
             "status": "ok" if difference <= 5 else "mismatch",
         }
+    if sync:
+        amount = b.amount_rs if b.amount_rs is not None else tariff.electricity_bill(
+            b.kwh, tariff_code=bill["tariff_class"] or "140", tv_licence=s.get("profile", {}).get("tv_licence", True)).total
+        bill["db_id"] = sync.mirror_bill("electricity", bill["start"], bill["end"], b.kwh, amount,
+                                         f"CEB {bill['tariff_class'] or '140'}" + ("" if b.amount_rs is not None else
+                                                                                  " (amount = tariff calculation)"), bill["id"])
     s["bills"].append(bill)
     latest_end = max(x["end"] for x in s["bills"])
     dropped = [r["id"] for r in s.get("readings", []) if r["date"] <= latest_end]
@@ -146,6 +157,8 @@ def delete_bill(bill_id: str):
     s = store.load()
     if not any(x["id"] == bill_id for x in s["bills"]):
         err(404, "not_found", f"No bill with id {bill_id}")
+    if sync:
+        sync.remove_bill(next(x for x in s["bills"] if x["id"] == bill_id).get("db_id"))
     s["bills"] = [x for x in s["bills"] if x["id"] != bill_id]
     store.log(s, "bill_deleted", id=bill_id)
     store.save(s)
@@ -181,6 +194,8 @@ def add_reading(r: ReadingIn):
     if later and r.index_kwh > min(x["index_kwh"] for x in later):
         err(422, "validation_error", "This reading is higher than a later reading. Check the date and number.")
     reading = {"id": uuid.uuid4().hex[:8], "date": r.date.isoformat(), "index_kwh": r.index_kwh}
+    if sync:
+        reading["db_id"] = sync.mirror_reading("electricity", r.index_kwh, reading["date"])
     s.setdefault("readings", []).append(reading)
     store.log(s, "reading_added", id=reading["id"], date=reading["date"], index_kwh=r.index_kwh)
     store.save(s)
@@ -267,6 +282,8 @@ def select_action(a: ActionIn):
         store.save(s)
         return existing
     rec = {"id": uuid.uuid4().hex[:8], "key": a.action, "params": p, "status": "selected", "selected_on": today(s).isoformat()}
+    if sync:
+        rec["db_id"] = sync.mirror_action("electricity", a.action, p, "selected")
     s.setdefault("actions", []).append(rec)
     store.log(s, "action_selected", action=a.action, id=rec["id"])
     store.save(s)
@@ -281,6 +298,8 @@ def complete_action(action_id: str):
         err(404, "not_found", f"No action with id {action_id}")
     if a["status"] != "completed":                           # idempotent: completing twice changes nothing
         a["status"], a["completed_on"] = "completed", today(s).isoformat()
+        if sync:
+            sync.mirror_action("electricity", a["key"], a.get("params"), "completed", a.get("db_id"))
         store.log(s, "action_completed", action=a["key"], id=action_id)
         store.save(s)
     return {**a, "forecast": forecast(s)}
