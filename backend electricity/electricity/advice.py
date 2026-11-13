@@ -380,6 +380,19 @@ def summary(state):
                 "message",
                 "Add a confirmed electricity bill or sufficient meter readings to generate a forecast."
             ),
+            "data_completeness": f.get("data_completeness"),
+            "forecast": {
+                "status": "insufficient_data",
+                "forecast_status": f.get("forecast_status", "insufficient_data"),
+                "unit": "kWh",
+                "confidence": f.get("confidence", "low"),
+                "method": "No forecast can be produced yet because there is not enough confirmed data.",
+                "data_completeness": f.get("data_completeness")
+            },
+            "benchmark": None,
+            "budget": None,
+            "context": None,
+            "recommendations": [],
             "recent_activity": recent_activity
         }
 
@@ -390,6 +403,7 @@ def summary(state):
         "period_start": f["period_start"],
         "period_end": f["period_end"],
         "forecast_status": f["forecast_status"],
+        "data_completeness": f.get("data_completeness"),
         "forecast": {
             "amount": f["kwh"]["mid"],
             "unit": "kWh",
@@ -399,7 +413,9 @@ def summary(state):
             "cost_low_rs": f["cost_rs"]["low"],
             "cost_high_rs": f["cost_rs"]["high"],
             "confidence": f["confidence"],
+            "forecast_status": f["forecast_status"],
             "method": f["method"],
+            "data_completeness": f.get("data_completeness"),
             "adjustments": f.get("adjustments", {})
         },
         "benchmark": insights_data["benchmark"],

@@ -104,7 +104,8 @@ def eligibility(key, params, state):
     if key == "cooking_hours":
         cooking = _answer(assessment, "cooking_energy", "E4")
 
-        if cooking is None or str(cooking).strip().lower() in ("", "not_sure", "not sure"):
+        cooked = str(cooking).strip().lower()
+        if cooking is None or cooked in ("", "not_sure", "not sure", "unsure"):
             return False, "Answer Electricity question 4 to check whether electric cooking applies."
 
         if str(cooking).strip().lower() not in ("electric", "both"):
@@ -130,7 +131,8 @@ def eligibility(key, params, state):
     if appliance == "air_conditioner":
         hours = _answer(assessment, "ac_hours", "E2")
 
-        if hours is None or str(hours).strip().lower() in ("", "not_sure", "not sure"):
+        normalized = str(hours).strip().lower()
+        if hours is None or normalized in ("", "not_sure", "not sure", "unsure"):
             return False, (
                 "Tell us how many hours a day you use the air conditioner "
                 "(Electricity question 2)."
@@ -142,7 +144,8 @@ def eligibility(key, params, state):
     if appliance == "water_heater":
         heating = _answer(assessment, "water_heating", "E3")
 
-        if heating is None or str(heating).strip().lower() in ("", "not_sure", "not sure"):
+        normalized = str(heating).strip().lower()
+        if heating is None or normalized in ("", "not_sure", "not sure", "unsure"):
             return False, "Answer Electricity question 3 to check your water-heating type."
 
         if str(heating).strip().lower() != "electric":

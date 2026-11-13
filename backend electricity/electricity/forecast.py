@@ -177,14 +177,96 @@ def _forecast_status(bills, checks):
     return "insufficient_data"
 
 
+def save_forecast_snapshot(state, forecast_result):
+    """Persist a snapshot of an issued forecast so later bills can be checked against it."""
+    if forecast_result.get("status") != "ok":
+        return None
+
+    snapshot = {
+        "kind": "forecast_snapshot",
+        "snapshot_id": f"forecast-{len(state.get('forecast_history', [])) + 1}",
+        "period_start": forecast_result["period_start"],
+        "period_end": forecast_result["period_end"],
+        "forecast_status": forecast_result.get("forecast_status", "preliminary"),
+        "predicted_kwh": forecast_result["kwh"]["mid"],
+        "predicted_cost_rs": forecast_result["cost_rs"]["mid"],
+        "confidence": forecast_result.get("confidence", "low"),
+        "created_at": today(state).isoformat(),
+    }
+
+    history = state.setdefault("forecast_history", [])
+    if not any(
+        item.get("period_start") == snapshot["period_start"]
+        and item.get("period_end") == snapshot["period_end"]
+        for item in history
+    ):
+        history.append(snapshot)
+
+    return snapshot
+
+
+def add_forecast_checks_for_bill(state, bill):
+    """Create actual checked forecasts when a confirmed bill covers a saved forecast snapshot."""
+    if not bill or not bill.get("kwh"):
+        return []
+
+    history = state.get("forecast_history", [])
+    if not history:
+        return []
+
+    bill_start = d(bill["start"])
+    bill_end = d(bill["end"])
+    checks = []
+
+    for snapshot in history:
+        snapshot_start = d(snapshot["period_start"])
+        snapshot_end = d(snapshot["period_end"])
+        if bill_end < snapshot_start or bill_start > snapshot_end:
+            continue
+
+        predicted_kwh = float(snapshot.get("predicted_kwh", 0.0))
+        actual_kwh = float(bill.get("kwh", 0.0))
+        error_kwh = predicted_kwh - actual_kwh
+        error_pct = abs(error_kwh) / actual_kwh * 100 if actual_kwh > 0 else 0.0
+        predicted_cost = float(snapshot.get("predicted_cost_rs", bill_for(state, predicted_kwh).total))
+        actual_cost = bill_for(state, actual_kwh).total
+
+        check = {
+            "kind": "forecast_checked",
+            "verified": True,
+            "snapshot_id": snapshot.get("snapshot_id"),
+            "period_start": snapshot["period_start"],
+            "period_end": snapshot["period_end"],
+            "actual_kwh": round(actual_kwh, 2),
+            "predicted_kwh": round(predicted_kwh, 2),
+            "error_kwh": round(error_kwh, 2),
+            "error_pct": round(error_pct, 2),
+            "actual_cost_rs": round(actual_cost, 2),
+            "predicted_cost_rs": round(predicted_cost, 2),
+            "error_rs": round(predicted_cost - actual_cost, 2),
+            "bill_id": bill.get("id"),
+        }
+
+        existing = state.setdefault("forecast_checks", [])
+        if not any(
+            item.get("snapshot_id") == check["snapshot_id"] and item.get("bill_id") == check["bill_id"]
+            for item in existing
+        ):
+            existing.append(check)
+            checks.append(check)
+
+    return checks
+
+
 def _has_assessment_answer(value):
     """Check whether an assessment question has a meaningful answer."""
     if value is None:
         return False
 
     if isinstance(value, str):
-        return value.strip().lower() not in (
-            "", "not sure", "not_sure", "unknown"
+        cleaned = value.strip().lower()
+        return cleaned not in (
+            "", "not sure", "not_sure", "notsure", "unsure", "unknown"
         )
 
     if isinstance(value, (list, tuple, set)):
@@ -302,7 +384,7 @@ def _expected_use_adjustment(state, baseline_kwh):
             "message": "No expected usage change."
         }
 
-    if direction in ("not_sure", "not sure"):
+    if direction in ("not_sure", "not sure", "unsure"):
         return {
             "status": "not_sure",
             "delta_kwh": 0.0,

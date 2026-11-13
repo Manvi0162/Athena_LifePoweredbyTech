@@ -10,9 +10,9 @@ from typing import Literal
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field, model_validator
 
-from . import actions, advice, store
+from . import actions, advice, store, tariff
 from .auth import err, require_login
-from .forecast import forecast
+from .forecast import add_forecast_checks_for_bill, forecast, save_forecast_snapshot
 from .history import daily_history, today
 
 router = APIRouter(prefix="/electricity", tags=["electricity"], dependencies=[Depends(require_login)])
@@ -54,11 +54,28 @@ def update_profile(p: Profile):
     return get_profile()
 
 
+# ---------- electricity assessment ----------
+@router.get("/assessment")
+def get_assessment():
+    return store.load().get("assessment", {})
+
+
+@router.put("/assessment")
+def update_assessment(payload: dict):
+    s = store.load()
+    s["assessment"] = {**s.get("assessment", {}), **payload}
+    store.log(s, "assessment_updated", fields=sorted(payload.keys()))
+    store.save(s)
+    return s["assessment"]
+
+
 # ---------- bills (numbers from the OCR team or typed in) ----------
 class BillIn(BaseModel):
     start: date
     end: date
     kwh: float = Field(..., ge=0, le=100000)
+    amount_rs: float | None = Field(None, ge=0, le=100000)
+    tariff_class: Literal["110", "120", "140"] | None = Field(None)
     start_reading: float | None = Field(None, ge=0)
     end_reading: float | None = Field(None, ge=0)
 
@@ -90,8 +107,28 @@ def add_bill(b: BillIn):
         if x.get("source") != "placeholder" and date.fromisoformat(x["start"]) < b.end and b.start < date.fromisoformat(x["end"]):
             err(409, "overlap", f"This bill overlaps the one from {x['start']} to {x['end']}. Correct the dates or delete that bill.")
     s["bills"] = [x for x in s["bills"] if x.get("source") != "placeholder"]   # the first real bill replaces the demo ones
-    bill = {"id": uuid.uuid4().hex[:8], "start": b.start.isoformat(), "end": b.end.isoformat(), "kwh": b.kwh,
-            "end_reading": b.end_reading, "source": "entered"}
+    bill = {
+        "id": uuid.uuid4().hex[:8],
+        "start": b.start.isoformat(),
+        "end": b.end.isoformat(),
+        "kwh": b.kwh,
+        "amount_rs": b.amount_rs,
+        "tariff_class": b.tariff_class or s.get("profile", {}).get("ceb_tariff"),
+        "end_reading": b.end_reading,
+        "source": "entered"
+    }
+    if b.amount_rs is not None:
+        expected_total = tariff.electricity_bill(
+            b.kwh,
+            tariff_code=bill["tariff_class"] or "140",
+            tv_licence=s.get("profile", {}).get("tv_licence", True),
+        ).total
+        difference = abs(expected_total - b.amount_rs)
+        bill["amount_check"] = {
+            "calculated_total_rs": round(expected_total, 2),
+            "difference_rs": round(difference, 2),
+            "status": "ok" if difference <= 5 else "mismatch",
+        }
     s["bills"].append(bill)
     latest_end = max(x["end"] for x in s["bills"])
     dropped = [r["id"] for r in s.get("readings", []) if r["date"] <= latest_end]
@@ -99,6 +136,7 @@ def add_bill(b: BillIn):
     if dropped:
         store.log(s, "readings_replaced_by_bill", ids=dropped)
     store.log(s, "bill_added", id=bill["id"], start=bill["start"], end=bill["end"], kwh=b.kwh)
+    add_forecast_checks_for_bill(s, bill)
     store.save(s)
     return {"bill": bill, "forecast": forecast(s)}
 
@@ -168,7 +206,17 @@ def history(days: int = 90):
 
 @router.get("/forecast")
 def get_forecast():
-    return forecast(store.load())
+    s = store.load()
+    f = forecast(s)
+    if f.get("status") == "ok":
+        save_forecast_snapshot(s, f)
+        store.save(s)
+    return f
+
+
+@router.get("/forecast-checks")
+def get_forecast_checks():
+    return store.load().get("forecast_checks", [])
 
 
 @router.get("/insights")
@@ -179,7 +227,12 @@ def get_insights():
 @router.get("/summary")
 def get_summary():
     """Shared module contract, read by the Household AI."""
-    return advice.summary(store.load())
+    s = store.load()
+    f = forecast(s)
+    if f.get("status") == "ok":
+        save_forecast_snapshot(s, f)
+        store.save(s)
+    return advice.summary(s)
 
 
 # ---------- actions ----------
@@ -236,6 +289,16 @@ def complete_action(action_id: str):
 @router.get("/activity")
 def activity():
     return list(reversed(store.load().get("activity", [])))
+
+
+@router.post("/activity")
+def add_activity(payload: dict):
+    s = store.load()
+    event = payload.get("event") or payload.get("name") or "manual_event"
+    details = payload.get("details", {}) if isinstance(payload.get("details", {}), dict) else {}
+    store.log(s, event, **details)
+    store.save(s)
+    return {"ok": True, "event": event, "activity": list(reversed(s.get("activity", [])))[:1]}
 
 
 @router.post("/demo/reset")
