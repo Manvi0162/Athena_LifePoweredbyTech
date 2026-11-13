@@ -38,6 +38,7 @@ export default function Register(){
         placeholder="you@example.com" keyboardType="email-address"/>
       <Field label="Password" value={password} onChangeText={setPassword}
         placeholder="At least 8 characters" secureTextEntry/>
+      {password&&password.length<8?<Note>{`${password.length}/8 characters: the password needs at least 8.`}</Note>:null}
       <Field label="Confirm password" value={confirmPassword} onChangeText={setConfirmPassword}
         placeholder="Re-enter your password" secureTextEntry/>
       <Btn title="Create account" onPress={()=>void createAccount()}/>
