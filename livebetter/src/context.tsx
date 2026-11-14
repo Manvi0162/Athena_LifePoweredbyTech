@@ -135,7 +135,7 @@ export function AppProvider({children}:{children:React.ReactNode}){
     let message='';
     await execute(async()=>{
       const r=await request<{token:string|null;message?:string;refresh_token?:string;mode?:string}>(routes.signup,'POST',{name,email,password});
-      if(r.token){await saveSession({token:r.token,refresh_token:r.refresh_token,email,mode:r.mode});setSignedIn(true);message='Account created.';}
+      if(r.token){await saveSession({token:r.token,refresh_token:r.refresh_token,email,mode:r.mode});setSignedIn(true);message='SESSION';}
       else message=r.message||'Account created. Confirm your email, then log in.';
     });
     return message;

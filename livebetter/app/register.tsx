@@ -24,8 +24,8 @@ export default function Register(){
     try{
       const message=await signup(name.trim(),email.trim(),password);
       if(demo){router.replace('/onboarding');return;}
-      if(message.startsWith('Account created.'))router.replace({pathname:'/security',params:{setup:'1'}});
-      else{Alert.alert(t('Check your email'),message);router.replace('/login');}
+      if(message==='SESSION')router.replace({pathname:'/security',params:{setup:'1'}});   // logged in: set the pattern now
+      else{Alert.alert(t('Check your email'),t('Account created. Open the link in the email we sent you, then log in. You will set your security pattern right after.'));router.replace('/login');}
     }catch(error){Alert.alert(t('Could not create account'),readError(error));}
   }
 

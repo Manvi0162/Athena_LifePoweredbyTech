@@ -3,7 +3,7 @@
 // Microsoft Authenticator: optional, the user decides here and can switch it on or off later.
 import React,{useCallback,useEffect,useState} from 'react';
 import {t} from '../src/i18n';
-import {Image,Text,View} from 'react-native';
+import {Image,Linking,Text,View} from 'react-native';
 import {router,useLocalSearchParams} from 'expo-router';
 import {useApp} from '../src/context';
 import {PatternGrid,usePattern} from '../src/pattern';
@@ -120,6 +120,9 @@ export default function Security(){
         <Image source={{uri:qr.qr_png}} style={{width:200,height:200,alignSelf:'center'}} accessibilityLabel="Authenticator QR code"/>
         <Note>{t('Can\'t scan? Enter this key:')} </Note>
         <Text selectable style={[S.title,{letterSpacing:1}]}>{qr.manual_key.match(/.{1,4}/g)?.join(' ')}</Text>
+        {/* On the same phone the QR code cannot be scanned: open the authenticator app directly instead. */}
+        <Btn title={t('Open in my authenticator app')} outline onPress={()=>{Linking.openURL(qr.otpauth_uri).catch(()=>
+          setMsg({text:t('No authenticator app opened. In Microsoft Authenticator choose + → Other account → Enter code manually, and type the key above.'),bad:true}));}}/>
         <Note>{t('2. Type the 6-digit code it shows. This key is shown only now.')}</Note>
         <Field label={t('6-digit code')} value={code} onChangeText={setCode} keyboardType="number-pad"/>
         <Btn title={t('Switch on')} onPress={()=>void confirmAuthenticator()}/>
@@ -148,7 +151,7 @@ export default function Security(){
     </Card>:null}
 
     {firstRun?<Card>
-      <Btn title={t('Continue to household setup  →')} disabled={!st?.pattern_set} onPress={()=>router.replace('/onboarding')}/>
+      <Btn title={t('Continue to household setup  →')} disabled={!st?.pattern_set} onPress={()=>router.replace(app.state.household?'/(tabs)/home':'/onboarding')}/>
       {!st?.pattern_set?<Note>{t('Set your pattern first. The authenticator is optional.')}</Note>:null}
     </Card>:null}
   </Page>;

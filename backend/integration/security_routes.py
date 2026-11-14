@@ -91,10 +91,16 @@ def reset_account(x_step_up: str | None = Header(default=None)):
     from water import store as wstore
     snapshot = {"water": wstore.load(), "electricity": estore.load(),
                 "tables": {t: _rows(ctx, h, t) for t in TABLES}}
+    kept = {}
     for t in reversed(TABLES):                         # children first
         ids = [r["id"] for r in snapshot["tables"][t]]
-        if ids:
+        if not ids:
+            continue
+        try:
             ctx.db.table(t).delete().in_("id", ids).execute()
+        except Exception as exc:                       # e.g. another table still points at these rows (database FK/RLS)
+            kept[t] = str(exc)[:160]
+            snapshot["tables"][t] = []                 # not deleted, so nothing to restore for this table
     wstore.reset(sample=False)
     estore.reset(sample=False)
     sec = S.load(ctx)
@@ -102,6 +108,9 @@ def reset_account(x_step_up: str | None = Header(default=None)):
     sec["reset_snapshot"] = {"household_id": h["id"], "at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                              "restore_until": until, "data": snapshot}
     counts = {t: len(v) for t, v in snapshot["tables"].items() if v}
+    if kept:
+        import logging
+        logging.getLogger(__name__).warning("Reset kept some tables: %s", kept)
     S.record(ctx, sec, "account_reset", restorable_until=until, records=counts)
     S.save(ctx, sec)
     return {"ok": True, "restorable_until": until, "cleared": counts,
@@ -130,7 +139,11 @@ def restore_account(x_step_up: str | None = Header(default=None)):
     for t in TABLES:                                   # parents first
         rows = snap["data"]["tables"].get(t) or []
         if rows:
-            ctx.db.table(t).upsert(rows).execute()
+            try:
+                ctx.db.table(t).upsert(rows).execute()
+            except Exception as exc:
+                import logging
+                logging.getLogger(__name__).warning("Restore of %s failed: %s", t, exc)
     wstore.save(snap["data"]["water"])
     estore.save(snap["data"]["electricity"])
     sec.pop("reset_snapshot", None)

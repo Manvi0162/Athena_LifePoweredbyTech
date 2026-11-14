@@ -32,50 +32,96 @@ function errorMessage(result: any, status: number, path: string) {
   return { message: result?.message || (typeof d === 'string' ? d : `HTTP ${status}: ${path}`), code: result?.code };
 }
 
+// Supabase access tokens expire after about an hour. On a 401 the app uses the refresh token once, saves the new
+// session and repeats the request, so the user is not suddenly "logged out" in the middle of the demo.
+let refreshing: Promise<boolean> | null = null;
+async function refreshSession(): Promise<boolean> {
+  if (!session.refresh_token) return false;
+  if (!refreshing) refreshing = (async () => {
+    try {
+      const r = await fetch(`${URL}/auth/refresh`, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ refresh_token: session.refresh_token }) });
+      if (!r.ok) return false;
+      const j: any = await r.json();
+      if (!j?.token) return false;
+      await saveSession({ ...session, token: j.token, refresh_token: j.refresh_token || session.refresh_token });
+      return true;
+    } catch { return false; } finally { setTimeout(() => { refreshing = null; }, 0); }
+  })();
+  return refreshing;
+}
+
+// Render's free plan sleeps: the first request after a while can take ~50 s, so the timeout is generous.
+const TIMEOUT = 60000;
+
 // stepUp = one-time permission from drawing the security pattern (misuse safeguard), sent as X-Step-Up.
 export async function request<T>(path: string, method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE' = 'GET', body?: unknown,
-  stepUp?: string): Promise<T> {
+  stepUp?: string, retried = false): Promise<T> {
   if (!URL) throw Error('Backend URL missing. Set EXPO_PUBLIC_API_URL in .env.local.');
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 20000);
+  const timer = setTimeout(() => controller.abort(), TIMEOUT);
+  let response: Response;
   try {
     const headers: Record<string, string> = { Accept: 'application/json', 'Content-Type': 'application/json' };
     if (session.token) headers.Authorization = `Bearer ${session.token}`;
     if (stepUp) headers['X-Step-Up'] = stepUp;
-    const response = await fetch(`${URL}${path}`, {
+    response = await fetch(`${URL}${path}`, {
       method, headers, body: body === undefined ? undefined : JSON.stringify(body), signal: controller.signal });
-    let result: unknown = null;
-    try { result = await response.json(); } catch {}
-    if (!response.ok) {
-      const e = errorMessage(result, response.status, path);
-      throw new ApiError(e.message, response.status, e.code, e.details);
-    }
-    return result as T;
+  } catch (e) {
+    throw Error((e as any)?.name === 'AbortError' ? 'The server took too long to answer. If it was asleep, try again in a few seconds.'
+      : `Cannot reach the server (${URL}). Check the internet connection.`);
   } finally { clearTimeout(timer); }
+  let result: unknown = null;
+  try { result = await response.json(); } catch {}
+  if (response.status === 401 && !retried && !path.startsWith('/auth/') && await refreshSession())
+    return request<T>(path, method, body, stepUp, true);
+  if (!response.ok) {
+    const e = errorMessage(result, response.status, path);
+    throw new ApiError(e.message, response.status, e.code, e.details);
+  }
+  return result as T;
 }
 
-export async function uploadImage<T>(path: string, imageUri: string, fields?: Record<string, string>): Promise<T> {
+// Photo upload. Android/iOS: XMLHttpRequest with {uri, name, type} (React Native's own networking). Expo's newer fetch
+// rejects that object with "Unsupported FormDataPart implementation", which is why receipts, bills and food scans
+// failed on the phone. Web: the picker gives a blob URL, sent as a real Blob.
+function xhrUpload(url: string, data: FormData, headers: Record<string, string>): Promise<{ status: number; body: any }> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', url);
+    for (const [k, v] of Object.entries(headers)) xhr.setRequestHeader(k, v);
+    xhr.timeout = TIMEOUT;
+    xhr.onload = () => { let body: any = null; try { body = JSON.parse(xhr.responseText); } catch {} resolve({ status: xhr.status, body }); };
+    xhr.onerror = () => reject(Error(`Cannot reach the server (${URL}). Check the internet connection.`));
+    xhr.ontimeout = () => reject(Error('The server took too long to answer. Try again.'));
+    xhr.send(data as any);
+  });
+}
+
+export async function uploadImage<T>(path: string, imageUri: string, fields?: Record<string, string>, retried = false): Promise<T> {
   if (!URL) throw Error('Backend URL missing.');
   const data = new FormData();
   for (const [k, v] of Object.entries(fields || {})) data.append(k, v);
-  // The food backend reads the photo from the `image` field.
+  const lower = imageUri.toLowerCase();
+  const type = lower.endsWith('.png') ? 'image/png' : lower.endsWith('.webp') ? 'image/webp' : 'image/jpeg';
+  const headers: Record<string, string> = { Accept: 'application/json' };
+  if (session.token) headers.Authorization = `Bearer ${session.token}`;
+  let res: { status: number; body: any };
   if (Platform.OS === 'web') {
-    // In a browser the picker gives a blob:/data: URL; the {uri,name,type} object only works on iOS/Android
-    // (on web it was sent as the text "[object Object]" -> "Expected UploadFile, received str").
     const blob = await (await fetch(imageUri)).blob();
-    data.append('image', blob, blob.type === 'image/png' ? 'receipt.png' : 'receipt.jpg');
+    data.append('image', blob, blob.type === 'image/png' ? 'photo.png' : 'photo.jpg');
+    const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), TIMEOUT);
+    try {
+      const r = await fetch(`${URL}${path}`, { method: 'POST', body: data, signal: controller.signal, headers });
+      res = { status: r.status, body: await r.json().catch(() => null) };
+    } finally { clearTimeout(timer); }
   } else {
-    data.append('image', { uri: imageUri, name: 'receipt.jpg', type: 'image/jpeg' } as any);
+    data.append('image', { uri: imageUri, name: type === 'image/png' ? 'photo.png' : 'photo.jpg', type } as any);
+    res = await xhrUpload(`${URL}${path}`, data, headers);
   }
-  const controller = new AbortController(); const timer = setTimeout(() => controller.abort(), 45000);
-  try {
-    const headers: Record<string, string> = { Accept: 'application/json' };
-    if (session.token) headers.Authorization = `Bearer ${session.token}`;
-    const response = await fetch(`${URL}${path}`, { method: 'POST', body: data, signal: controller.signal, headers });
-    const result = await response.json().catch(() => null);
-    if (!response.ok) { const e = errorMessage(result, response.status, path); throw new ApiError(e.message, response.status, e.code); }
-    return result as T;
-  } finally { clearTimeout(timer); }
+  if (res.status === 401 && !retried && await refreshSession()) return uploadImage<T>(path, imageUri, fields, true);
+  if (res.status < 200 || res.status >= 300) { const e = errorMessage(res.body, res.status, path); throw new ApiError(e.message, res.status, e.code, e.details); }
+  return res.body as T;
 }
 
 // Contract implemented by backend/integration/gateway.py and the module routers.

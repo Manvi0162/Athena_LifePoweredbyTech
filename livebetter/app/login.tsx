@@ -13,19 +13,26 @@ export default function Login(){
   const [mfa,setMfa]=useState<{token:string;message:string}|null>(null);
   const [code,setCode]=useState('');
   const [recovery,setRecovery]=useState(false);
-  const go=(household:boolean)=>router.replace(household?'/(tabs)/home':'/onboarding');
+  const {securityStatus}=useApp();
+  // First login after confirming the email (Supabase): the security pattern is set before anything else.
+  const go=async(household:boolean)=>{
+    let needsPattern=false;
+    if(!demo){try{needsPattern=!(await securityStatus()).pattern_set;}catch{}}
+    if(needsPattern)router.replace({pathname:'/security',params:{setup:'1'}});
+    else router.replace(household?'/(tabs)/home':'/onboarding');
+  };
 
   async function submit(){
     if(!email.trim()||!password)return Alert.alert(t('Missing details'),t('Enter your email and password.'));
     try{
       const r=await login(email.trim(),password);
       if(r.mfa){setMfa(r.mfa);setPassword('');return;}
-      go(r.household);
+      await go(r.household);
     }catch(error){Alert.alert(t('Could not log in'),readError(error));}
   }
   async function submitCode(){
     if(!mfa||!code.trim())return;
-    try{go((await loginCode(mfa.token,code,recovery)).household);}
+    try{await go((await loginCode(mfa.token,code,recovery)).household);}
     catch(error){setCode('');Alert.alert(t('Code not accepted'),readError(error));}
   }
 

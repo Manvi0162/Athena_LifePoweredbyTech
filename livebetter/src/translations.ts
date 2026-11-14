@@ -1,6 +1,9 @@
 // French and Kreol Morisien texts for every screen (key = the English text in the app).
 // Kreol Morisien follows the standard spelling (Lortograf Kreol Morisien); please have a native speaker review it.
 export const FR:Record<string,string>={
+  "Open in my authenticator app":"Ouvrir dans mon application d'authentification",
+  "No authenticator app opened. In Microsoft Authenticator choose + → Other account → Enter code manually, and type the key above.":"Aucune application ne s'est ouverte. Dans Microsoft Authenticator : + → Autre compte → Entrer le code manuellement, puis tapez la clé ci-dessus.",
+  "Account created. Open the link in the email we sent you, then log in. You will set your security pattern right after.":"Compte créé. Ouvrez le lien dans l'e-mail reçu, puis connectez-vous. Vous définirez ensuite votre schéma de sécurité.",
   "Set your security pattern":"Définissez votre schéma de sécurité",
   "Without it, anyone using this phone could reset your account or delete bills.":"Sans lui, n'importe qui avec ce téléphone pourrait réinitialiser votre compte ou supprimer des factures.",
   "Your pantry is empty":"Votre garde-manger est vide",
@@ -408,6 +411,9 @@ export const FR:Record<string,string>={
   "📷 Take receipt photo":"📷 Photographier le ticket",
 };
 export const MFE:Record<string,string>={
+  "Open in my authenticator app":"Ouver dan mo aplikasion authenticator",
+  "No authenticator app opened. In Microsoft Authenticator choose + → Other account → Enter code manually, and type the key above.":"Okenn aplikasion pa finn ouver. Dan Microsoft Authenticator: + → Lot kont → Antre kod ar lamin, ek tap lakle anler.",
+  "Account created. Open the link in the email we sent you, then log in. You will set your security pattern right after.":"Kont kree. Ouver lien dan imel ki nou finn avoye, apre konekte. Apre sa ou met ou desin sekirite.",
   "Set your security pattern":"Met ou desin sekirite",
   "Without it, anyone using this phone could reset your account or delete bills.":"San li, ninport kisannla ki servi sa portab-la kapav reset ou kont ouswa efas factir.",
   "Your pantry is empty":"Ou gardmanze vid",

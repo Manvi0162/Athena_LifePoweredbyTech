@@ -77,20 +77,18 @@ def record(ctx, sec, event, **details):
 
 # ---------- encryption of the authenticator secret ----------
 def _fernet():
+    """Key for the authenticator secrets. MFA_ENCRYPTION_KEY if set (a Fernet key). Otherwise a key derived from
+    LIVEBETTER_SECRET, so it stays the same after every restart or redeploy (Render wipes local files, and a new random
+    key would make every switched-on authenticator unreadable). Set one of the two on the server."""
     from cryptography.fernet import Fernet
     key = os.environ.get("MFA_ENCRYPTION_KEY", "").strip()
-    if not key:
-        from .identity import mode
-        if mode() != "local":
-            raise SecurityError(503, "mfa_not_configured", "Two-step login is not configured on the server "
-                                                          "(MFA_ENCRYPTION_KEY missing in backend/.env).")
-        path = os.path.join(accounts._root(), "mfa.key")       # local mode: one key file, git-ignored
-        if not os.path.exists(path):
-            with open(path, "wb") as fh:
-                fh.write(Fernet.generate_key())
-        with open(path, "rb") as fh:
-            key = fh.read().decode()
-    return Fernet(key.encode() if isinstance(key, str) else key)
+    if key:
+        try:
+            return Fernet(key.encode())
+        except Exception:
+            pass                                          # not a Fernet key: derive one from it instead
+    seed = key or os.environ.get("LIVEBETTER_SECRET", "change-me")
+    return Fernet(base64.urlsafe_b64encode(hashlib.sha256(("livebetter-mfa:" + seed).encode()).digest()))
 
 
 def _encrypt(text):

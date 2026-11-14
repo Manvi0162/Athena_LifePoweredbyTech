@@ -223,6 +223,20 @@ one were removed (language switch, manual pantry edit, expiry dates, "try one ch
 - **Recipes:** scanning an ingredient shows database recipes AND an AI-generated recipe; **Use this recipe · I cooked
   it** saves it and lowers the pantry stock; **My recipes** lists saved recipes and all database recipes.
 
+## Phone / cloud checklist (Render + Supabase + APK)
+- **Render environment variables:** `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `GEMINI_API_KEY`, `LIVEBETTER_SECRET`
+  (long random text, never change it after go-live), optionally `MFA_ENCRYPTION_KEY`. Without `MFA_ENCRYPTION_KEY` the
+  authenticator key is derived from `LIVEBETTER_SECRET`, so authenticators keep working after every redeploy.
+- **Supabase SQL:** `backend/sql/03_module_state.sql` and `04_user_security.sql` must be run once.
+- **Email confirmation:** with Supabase "Confirm email" on, Register shows "check your email"; the user confirms, logs
+  in, and is taken to the security setup first. For the demo you can switch it off in Supabase → Authentication →
+  Providers → Email.
+- **Photos on Android** (receipt, bill, food scan) are uploaded with React Native's XMLHttpRequest; Expo's fetch rejected
+  them ("Unsupported FormDataPart implementation").
+- **Sessions:** Supabase tokens expire after about an hour; the app refreshes them automatically.
+- **Render free plan sleeps:** open `https://YOUR-BACKEND.onrender.com/docs` a minute before the demo; the app waits up
+  to 60 s for the first answer.
+
 ## Surprise card: Misuse
 
 **Misuse we identified:** someone who picks up the owner's unlocked, signed-in phone (a child playing, a housemate,

@@ -33,7 +33,8 @@ export function PatternGrid({value,onChange,disabled}:{value:number[];onChange:(
     style={{width:SIZE,height:SIZE,alignSelf:'center',borderRadius:22,backgroundColor:C.bg,opacity:disabled?0.5:1}}
     onLayout={(e:LayoutChangeEvent)=>{box.current={w:e.nativeEvent.layout.width,h:e.nativeEvent.layout.height};}}
     onStartShouldSetResponder={()=>!disabled} onMoveShouldSetResponder={()=>!disabled}
-    onResponderGrant={add} onResponderMove={add}>
+    onResponderGrant={add} onResponderMove={add}
+    onResponderTerminationRequest={()=>false} onStartShouldSetResponderCapture={()=>!disabled} onMoveShouldSetResponderCapture={()=>!disabled}>
     {value.slice(1).map((d,i)=>{               // lines between consecutive dots
       const a=centre(value[i]),b=centre(d);
       const len=Math.hypot(b.x-a.x,b.y-a.y), ang=Math.atan2(b.y-a.y,b.x-a.x);
