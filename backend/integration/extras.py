@@ -138,7 +138,7 @@ def explain_forecast(kind, use_ai=True, lang="en"):
     rel = f.get("reliability") or {}
     if rel.get("mean_abs_error_pct") is not None:
         factors.append({"label": "Accuracy so far", "value": f"±{_fmt(rel['mean_abs_error_pct'], 1)}%",
-                        "detail": f"average error when we predicted your past bills ({rel.get('backtests', 0)} tests)"})
+                        "detail": f"MAPE (mean absolute percentage error): average error when we predicted your past bills ({rel.get('backtests', 0)} tests)"})
     dc = f.get("data_completeness") or {}
     pct = dc.get("pct", dc.get("score"))
     if pct is not None:

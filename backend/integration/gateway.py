@@ -225,7 +225,10 @@ def forecast_for_ui(kind):
                 "cost_range": {"low": f["cost_rs"]["low"], "high": f["cost_rs"]["high"]},
                 "confidence": CONF.get(fs, "limited_history"), "method": f["method"], "assumptions": f["assumptions"],
                 "source_data": [b["id"] for b in estore.load().get("bills", [])],
-                "bill_breakdown": f["bill_breakdown"]["lines"], "adjustments": f.get("adjustments")}
+                "bill_breakdown": f["bill_breakdown"]["lines"], "adjustments": f.get("adjustments"),
+                "reliability": {"mean_abs_error_pct": (f.get("source_data") or {}).get("mean_absolute_error_pct"),
+                                "backtests": (f.get("source_data") or {}).get("historical_backtests", 0),
+                                "checked_forecasts": (f.get("source_data") or {}).get("forecast_checks", 0)}}
     err(422, "validation_error", "category must be 'water' or 'electricity'")
 
 

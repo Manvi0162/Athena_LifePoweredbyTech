@@ -545,10 +545,10 @@ def forecast(state, extra_saving_per_day=0.0):
         for key, value in kwh.items()
     }
 
-    mean_absolute_error = (
-        round(mean(check["error_pct"] for check in checks), 2)
-        if checks else None
-    )
+    # MAPE: mean ABSOLUTE percentage error (a signed mean would let +10% and -10% cancel out to 0%).
+    # Uses the real checked forecasts and the historical backtests (each bill predicted from earlier bills only).
+    _errors = [abs(c["error_pct"]) for c in list(checks) + list(backtests) if c.get("error_pct") is not None]
+    mean_absolute_error = round(mean(_errors), 2) if _errors else None
 
     return {
         "module": "electricity",
