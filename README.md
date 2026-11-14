@@ -255,3 +255,298 @@ Automated: `backend/tests/test_security.py` (6 tests).
 
 For app-specific setup and command details, see the README inside `livebetter/`.
 
+
+## LiveBetter — Backend Deployment & APK Build Guide
+
+### 1. Backend Deployment (Render)
+
+The LiveBetter backend uses **Python FastAPI**, hosted on **Render**, with **Supabase PostgreSQL** for database storage.
+
+**Deployment steps:**
+1. Push the backend code to the GitHub repository.
+2. Open [Render Dashboard](https://dashboard.render.com/) and create a new **Web Service** connected to the GitHub repository.
+3. Select the Python runtime and configure:
+   - **Root Directory:** Backend folder (if applicable).
+   - **Build Command:** `pip install -r requirements.txt`
+   - **Start Command:** `uvicorn app:app --host 0.0.0.0 --port $PORT`
+4. Ensure `requirements.txt` includes `fastapi`, `uvicorn[standard]`, and other required dependencies.
+5. Configure the necessary database credentials and API secrets in Render's environment variables.
+6. Deploy and verify the backend at `https://YOUR-BACKEND.onrender.com/docs`.
+
+**Updating the backend:**
+
+```bash
+git add .
+git commit -m "Update backend"
+git push origin Sanjana
+```
+
+If Auto-Deploy is enabled, Render automatically deploys changes pushed to the configured branch. Otherwise, use **Manual Deploy → Deploy latest commit**.
+
+Use **Clear build cache & deploy** only when troubleshooting build or dependency caching problems.
+
+### 2. Connect the Frontend to Render
+
+In the Expo frontend's `.env.local` file:
+
+```dotenv
+EXPO_PUBLIC_USE_MOCKS=false
+EXPO_PUBLIC_API_URL=https://YOUR-BACKEND.onrender.com
+```
+
+Replace the URL with the actual deployed backend address.
+
+### 3. Run the Frontend (Development)
+
+Open a terminal in the `livebetter` frontend folder:
+
+```bash
+npm install
+npx expo start --clear
+```
+
+Scan the QR code using Expo Go on Android.
+
+If there are network connection issues:
+
+```bash
+npx expo start --tunnel
+```
+
+### 4. Build the Android APK
+
+**One-time setup:**
+
+```bash
+npm install -g eas-cli
+eas login
+eas build:configure
+```
+
+Ensure `eas.json` contains:
+
+```json
+{
+  "build": {
+    "preview": {
+      "distribution": "internal",
+      "environment": "preview",
+      "android": {
+        "buildType": "apk"
+      }
+    }
+  }
+}
+```
+
+**Configure production-connected API settings for the preview build:**
+
+```bash
+eas env:create --environment preview --name EXPO_PUBLIC_USE_MOCKS --value false --visibility plaintext
+eas env:create --environment preview --name EXPO_PUBLIC_API_URL --value https://YOUR-BACKEND.onrender.com --visibility plaintext
+```
+
+If variables already exist, update them instead of creating duplicates.
+
+**Build the APK:**
+
+```bash
+eas build --platform android --profile preview
+```
+
+After successful compilation, Expo provides a download link for the installable APK.
+
+### 5. Architecture
+
+**Android APK (React Native + Expo)** → **Render (FastAPI Backend)** → **Supabase PostgreSQL + AI/Forecasting Services**
+
+The APK contains the mobile frontend. The backend runs separately on Render and communicates through HTTPS.
+
+**Important:** Backend code changes require a Render redeployment but usually do not require rebuilding the APK. Frontend code changes require a new APK build for the updated installable application. Changes to the backend URL embedded in the APK also require rebuilding it.
+
+
+## LiveBetter — Backend Contingency Plan (Render Failure)
+
+**Objective:** Ensure LiveBetter remains demonstrable if Render crashes, becomes unavailable, or experiences network issues during the hackathon.
+
+### Plan A — Restore Render (Primary)
+
+1. Open [Render Dashboard](https://dashboard.render.com/) and inspect the service logs.
+2. Check for missing dependencies, incorrect environment variables, or application errors.
+3. Select **Manual Deploy → Deploy latest commit** to redeploy.
+4. Verify `https://YOUR-BACKEND.onrender.com/docs` is accessible.
+
+If Render is experiencing a platform-wide outage, immediately switch to Plan B.
+
+### Plan B — Run FastAPI Locally (Secondary)
+
+Run the backend on a team laptop connected to the same Wi-Fi as the Android device.
+
+**1. Start the backend:**
+
+```bash
+cd backend
+python -m pip install -r requirements.txt
+python -m uvicorn app:app --host 0.0.0.0 --port 8000
+```
+
+**2. Find the laptop's local IPv4 address:**
+
+Windows:
+
+```bash
+ipconfig
+```
+
+Look for the Wi-Fi adapter's IPv4 address, for example `192.168.1.10`.
+
+**3. Update frontend `.env.local`:**
+
+```dotenv
+EXPO_PUBLIC_USE_MOCKS=false
+EXPO_PUBLIC_API_URL=http://192.168.1.10:8000
+```
+
+**4. Restart Expo:**
+
+```bash
+npx expo start --tunnel
+```
+
+Test the API using `http://192.168.1.10:8000/docs` from the phone.
+
+**Important:** This local-IP approach is for development using Expo Go. An already-built APK retains its embedded API URL. Switching it to a local HTTP backend may require changing Android network-security settings and rebuilding the APK. The laptop and phone must share the same accessible network, and the laptop firewall must permit port 8000.
+
+### Plan C — Offline Demo Mode (Last Resort)
+
+If both cloud and local backend connections fail, use the frontend's existing mock-data functionality.
+
+**1. Change `.env.local`:**
+
+```dotenv
+EXPO_PUBLIC_USE_MOCKS=true
+```
+
+**2. Restart Expo:**
+
+```bash
+npx expo start --tunnel
+```
+
+Demonstrate onboarding, sample utility estimates, pantry inventory, recipe interactions and AI Coach screens using explicitly labeled fictional data stored locally.
+
+For a standalone offline APK, build a separate preview configuration with `EXPO_PUBLIC_USE_MOCKS=true` set in EAS.
+
+**Limitation:** Demo mode does not prove actual backend integration, verified tariff calculations, real OCR or dataset-powered AI. Do not present it as equivalent to the live system.
+
+**Failover priority:** Render → Local FastAPI → Offline Demo APK → Backup video.
+
+## LiveBetter — APK Failure Contingency Plan
+
+**Objective:** Demonstrate the full LiveBetter application if the Android APK fails to install, crashes, or cannot be built.
+
+### Plan A — Run with Expo Go (Recommended Fallback)
+
+Use Expo Go to run the React Native application directly on an Android phone without installing the standalone APK.
+
+**1. Install Expo Go**
+
+Download [Expo Go](https://expo.dev/go) on the Android phone. Ensure its SDK version is compatible with the project's Expo SDK.
+
+**2. Open the frontend project**
+
+In Git Bash or VS Code terminal:
+
+```bash
+cd livebetter
+npm install
+npx expo start --clear
+```
+
+**3. Connect the Android phone**
+
+- Connect the laptop and phone to the same Wi-Fi network.
+- Open Expo Go and scan the QR code displayed in the terminal.
+- The LiveBetter application should load directly.
+
+**4. If the network connection fails**
+
+Stop Expo using `Ctrl + C`, then run:
+
+```bash
+npx expo start --tunnel
+```
+
+Scan the new QR code.
+
+**Important:** The laptop must remain powered on, with the Expo development server running throughout the demonstration. The deployed FastAPI backend must also remain accessible.
+
+### Plan B — Run in Laptop Browser (Secondary Fallback)
+
+Expo supports running React Native applications in a web browser, provided the required web dependencies and components are compatible.
+
+**1. Install web dependencies**
+
+Inside the frontend directory:
+
+```bash
+cd livebetter
+npx expo install react-dom react-native-web @expo/metro-runtime
+```
+
+**2. Verify backend configuration**
+
+In `.env.local`:
+
+```dotenv
+EXPO_PUBLIC_USE_MOCKS=false
+EXPO_PUBLIC_API_URL=https://YOUR-BACKEND.onrender.com
+```
+
+**3. Launch the web application**
+
+```bash
+npx expo start --web --clear
+```
+
+Open the local address displayed in the terminal, typically:
+
+`http://localhost:8081`
+
+**4. Demonstrate LiveBetter**
+
+Use the browser to demonstrate onboarding, dashboard, utility estimates, pantry management, recipe recommendations, and AI Coach.
+
+**Limitations:** Browser support must be tested in advance. Camera/image-picker behavior may differ from Android, and the FastAPI backend must allow the browser's origin through its CORS configuration.
+
+### Plan C — Offline Demonstration (Last Resort)
+
+If both the APK and backend integration fail, switch to the frontend's local demo mode.
+
+Update `.env.local`:
+
+```dotenv
+EXPO_PUBLIC_USE_MOCKS=true
+```
+
+Restart Expo using either:
+
+```bash
+# Android through Expo Go
+npx expo start --tunnel
+```
+
+Or:
+
+```bash
+# Laptop browser
+npx expo start --web --clear
+```
+
+Demonstrate the predefined fictional household, manual bill entry, pantry operations, recipe interactions, and local AI Coach interface.
+
+Clearly disclose that the demonstration uses simulated data rather than live backend services.
+
+**Fallback priority:** Standalone APK → Expo Go → Laptop browser → Offline Demo → Backup video.
+
+**Important:** Expo Go and the laptop browser are development-server alternatives, not standalone APK replacements. Both require the laptop and Expo server to remain running. They should be verified before the judging session, not configured for the first time during the demonstration.
