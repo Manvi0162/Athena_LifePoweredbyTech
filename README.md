@@ -223,6 +223,26 @@ one were removed (language switch, manual pantry edit, expiry dates, "try one ch
 - **Recipes:** scanning an ingredient shows database recipes AND an AI-generated recipe; **Use this recipe · I cooked
   it** saves it and lowers the pantry stock; **My recipes** lists saved recipes and all database recipes.
 
+## 14 Nov (early morning): conversational coach, plan in the forecast, friendly errors
+
+- **Coach is a conversation.** "Hello" gets a hello back. "I want to shower more" gets "How many minutes more per
+  shower?" with tap-to-answer chips (2 / 5 / 10 min); if the water heating is unknown it asks "How is your shower water
+  heated?" once and remembers the answer (electricity habit E3). Then it shows the water AND electricity effect.
+  "Apply it", "yes" or the **Apply to my plan** button adds exactly that change to the plan. Thanks / bye / "how are
+  you" are answered too. Rules first; Gemini only classifies unclear questions into the same changes (never calculates).
+  Memory: the server returns `context` (follow-up question or last change) and the app sends it back with the next
+  message; every number is recalculated on the server (`big_brain/whatif.py: converse`).
+- **Applied plans change the predicted bills.** `GET /household/insights` returns `plan_effect`: all applied changes are
+  added together (litres, kWh) and each next bill is recalculated once with the official tariff. Home shows
+  "With your plan: Rs …" under Water and Electricity. Remove a change with ✕ in the Coach plan bar
+  (`DELETE /household/plans/{id}`) and the forecast goes back.
+- **Friendly errors.** Bill overlap: "You already added an electricity bill for 1 Aug 2026 to 31 Aug 2026 … Check the
+  dates on the bill, or delete the old bill in Utilities first" with a **See my bills** button, shown next to the Save
+  button (no pop-up + banner twice). Form errors are worded per field ("Check the billing start date: use a date like
+  2026-09-13"), unexpected server errors say "Something went wrong on our side. Your data is safe…", network errors say
+  what to do. No "HTTP 500", JSON or API paths are shown.
+- **Tariff class is a dropdown** (Domestic / Industrial) in household setup.
+
 ## Phone / cloud checklist (Render + Supabase + APK)
 - **Render environment variables:** `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `GEMINI_API_KEY`, `LIVEBETTER_SECRET`
   (long random text, never change it after go-live), optionally `MFA_ENCRYPTION_KEY`. Without `MFA_ENCRYPTION_KEY` the

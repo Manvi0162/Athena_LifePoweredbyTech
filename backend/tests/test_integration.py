@@ -196,7 +196,7 @@ def test_coach_uses_module_numbers(client):
     onboard(client)
     client.post("/bills", json={"kind": "water", "period_start": "2026-09-13", "period_end": "2026-10-13", "units": 24})
     a = client.post("/household/coach", json={"message": "How can I spend less?"}).json()
-    assert a["intent"] == "help" and a["suggestions"]
+    assert a["intent"] == "chat" and "What would you like to try" in a["answer"] and not a["changes"]
     w = client.post("/household/coach", json={"message": "What if I use 10% less water?"}).json()
     assert w["intent"] == "what_if" and w["changes"][0]["status"] == "ok" and w["changes"][0]["delta_rs"] <= 0
 

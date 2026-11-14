@@ -34,8 +34,9 @@ type Context={
   searchRecipes:(ingredients:string[])=>Promise<RecipeMatch[]>;
   generateRecipe:(ingredients:string[])=>Promise<AIRecipe>;
   saveRecipe:(recipe:AIRecipe['recipe'])=>Promise<string>;
-  applyPlan:(question:string)=>Promise<CoachReply>;
+  applyPlan:(question:string,plan?:Record<string,any>[])=>Promise<CoachReply>;
   plans:()=>Promise<Plan[]>;
+  removePlan:(id:string)=>Promise<Plan[]>;
   addBill:(v:Omit<Bill,'id'|'household_id'|'currency'>)=>Promise<void>;
   addItem:(v:Omit<PantryItem,'id'> & {id?:string})=>Promise<void>;
   confirmReceipt:(items:ReceiptItem[],receiptId?:string)=>Promise<void>;
@@ -45,7 +46,7 @@ type Context={
   recipes:()=>Promise<Recipe[]>;
   cook:(recipeId:string,actionId:string)=>Promise<void>;
   scenario:(kind:UtilityKind,percent:number)=>Promise<Scenario>;
-  ask:(message:string)=>Promise<CoachReply>;
+  ask:(message:string,context?:Record<string,any>)=>Promise<CoachReply>;
   refreshPantry:()=>Promise<void>;
 };
 const empty:Snapshot={household:null,bills:[],pantry:[],receipts:[],activity:[],completed_actions:[]};
@@ -222,9 +223,9 @@ export function AppProvider({children}:{children:React.ReactNode}){
     if(DEMO_MODE)return mockScenario(state,kind,percent);
     return request<Scenario>(routes.scenario,'POST',{category:kind,reduction_percent:percent});
   };
-  const ask=async(message:string)=>{
+  const ask=async(message:string,context?:Record<string,any>)=>{
     if(DEMO_MODE)throw Error('demo');
-    const r=await request<CoachReply>(routes.coach,'POST',{message,language:getLang()});
+    const r=await request<CoachReply>(routes.coach,'POST',{message,language:getLang(),context:context||null});
     loadLive().catch(()=>undefined);
     return r;
   };
@@ -265,8 +266,10 @@ export function AppProvider({children}:{children:React.ReactNode}){
   const searchRecipes=async(ingredients:string[])=>{live();
     return (await request<{matches:RecipeMatch[]}>(routes.searchRecipes,'POST',{ingredients})).matches;};
   const generateRecipe=async(ingredients:string[])=>{live();return request<AIRecipe>(routes.generateRecipe,'POST',{ingredients});};
-  const applyPlan=async(question:string)=>{live();
-    const r=await request<CoachReply>('/household/coach/apply','POST',{question,language:getLang()});loadLive().catch(()=>undefined);return r;};
+  const applyPlan=async(question:string,plan?:Record<string,any>[])=>{live();
+    const r=await request<CoachReply>('/household/coach/apply','POST',{question,plan:plan||null,language:getLang()});loadLive().catch(()=>undefined);return r;};
+  const removePlan=async(id:string)=>{live();
+    const r=await request<Plan[]>(`/household/plans/${encodeURIComponent(id)}`,'DELETE');loadLive().catch(()=>undefined);return r;};
   const plans=useCallback(async()=>{live();return request<Plan[]>('/household/plans');},[]);
   const saveRecipe=async(recipe:AIRecipe['recipe'])=>{live();let id='';
     await execute(async()=>{id=(await request<{recipe_id:string}>(routes.drafts,'POST',{recipe})).recipe_id;});
@@ -275,7 +278,7 @@ export function AppProvider({children}:{children:React.ReactNode}){
     login,loginCode,signup,logout,loadSample,refreshAll,onboard,deleteBill,addBill,addItem,confirmReceipt,parseReceipt,forecast,
     insights,recipes,cook,scenario,ask,refreshPantry,securityStatus,setPattern,verifyPattern,authenticatorSetup,
     authenticatorConfirm,authenticatorDisable,resetAccount,restoreAccount,resetStatus,parseBill,explain,habits,saveHabits,
-    recognizeFood,describeFood,searchRecipes,generateRecipe,saveRecipe,applyPlan,plans}),
+    recognizeFood,describeFood,searchRecipes,generateRecipe,saveRecipe,applyPlan,plans,removePlan}),
     // Event handlers bind the latest state each render.
     [ready,busy,state,error,signedIn,lang]);
   // Screens mount only after the saved login is loaded, so their first requests carry the token.

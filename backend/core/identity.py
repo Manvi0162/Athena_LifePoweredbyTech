@@ -115,7 +115,7 @@ def err(status, code, message, details=None):
 def require_context():
     ctx = CURRENT.get()
     if ctx is None:
-        err(401, "unauthorized", "Log in first: send 'Authorization: Bearer <access token>' (POST /auth/login).")
+        err(401, "unauthorized", "Please log in to continue.")
     return ctx
 
 
@@ -123,7 +123,7 @@ def require_household():
     ctx = require_context()
     h = household(ctx)
     if h is None:
-        err(409, "onboarding_required", "Set up your household first (POST /households/onboarding).")
+        err(409, "onboarding_required", "Set up your household first: it takes about a minute.")
     return ctx, h
 
 

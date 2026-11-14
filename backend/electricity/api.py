@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field, model_validator
 
 from . import actions, advice, store, tariff
 from .auth import err, require_login
+from core.errors import nice_date
 from .forecast import add_forecast_checks_for_bill, forecast, save_forecast_snapshot
 from .history import daily_history, today
 
@@ -111,10 +112,12 @@ def list_bills():
 def add_bill(b: BillIn):
     s = store.load()
     if b.end > today(s):
-        err(422, "validation_error", f"Bill end date {b.end} is in the future")
+        err(422, "validation_error", f"The bill ends on {nice_date(b.end)}, which is in the future. Check the end date on your bill.")
     for x in s["bills"]:
         if x.get("source") != "placeholder" and date.fromisoformat(x["start"]) < b.end and b.start < date.fromisoformat(x["end"]):
-            err(409, "overlap", f"This bill overlaps the one from {x['start']} to {x['end']}. Correct the dates or delete that bill.")
+            err(409, "overlap", f"You already added an electricity bill for {nice_date(x['start'])} to {nice_date(x['end'])}, and these dates "
+                                f"({nice_date(b.start)} to {nice_date(b.end)}) overlap it. Check the dates on the bill, or delete "
+                                "the old bill in Utilities first.", {"bill_id": x["id"], "start": x["start"], "end": x["end"]})
     s["bills"] = [x for x in s["bills"] if x.get("source") != "placeholder"]   # the first real bill replaces the demo ones
     bill = {
         "id": uuid.uuid4().hex[:8],
@@ -189,19 +192,19 @@ def list_readings():
 def add_reading(r: ReadingIn):
     s = store.load()
     if r.date > today(s):
-        err(422, "validation_error", f"Reading date {r.date} is in the future")
+        err(422, "validation_error", f"{nice_date(r.date)} is in the future. Use today's date or earlier.")
     bills = sorted(s["bills"], key=lambda b: b["end"])
     if bills and r.date <= date.fromisoformat(bills[-1]["end"]):
-        err(422, "validation_error", f"Readings are for after the last bill (which ends {bills[-1]['end']}).")
+        err(422, "validation_error", f"Your last bill already covers up to {nice_date(bills[-1]['end'])}. Add a meter reading taken after that date.")
     if any(x["date"] == r.date.isoformat() for x in s.get("readings", [])):
-        err(409, "duplicate", f"There is already a reading for {r.date}. Delete it first.")
+        err(409, "duplicate", f"You already added a reading for {nice_date(r.date)}. Delete that one first if it was wrong.")
     earlier = [x for x in s.get("readings", []) if x["date"] < r.date.isoformat()]
     floor = max([x["index_kwh"] for x in earlier] + ([bills[-1]["end_reading"]] if bills and bills[-1].get("end_reading") is not None else []), default=None)
     if floor is not None and r.index_kwh < floor:
-        err(422, "validation_error", f"The meter cannot go backwards: {r.index_kwh:g} is below the previous reading {floor:g}.")
+        err(422, "validation_error", f"This number ({r.index_kwh:g}) is lower than your previous reading ({floor:g}). A meter only goes up, so check the number.")
     later = [x for x in s.get("readings", []) if x["date"] > r.date.isoformat()]
     if later and r.index_kwh > min(x["index_kwh"] for x in later):
-        err(422, "validation_error", "This reading is higher than a later reading. Check the date and number.")
+        err(422, "validation_error", "This number is higher than a reading you took later. Check the date and the number.")
     reading = {"id": uuid.uuid4().hex[:8], "date": r.date.isoformat(), "index_kwh": r.index_kwh}
     if sync:
         reading["db_id"] = sync.mirror_reading("electricity", r.index_kwh, reading["date"])

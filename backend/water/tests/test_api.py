@@ -3,7 +3,7 @@
 
 def test_login_required(client):
     r = client.get("/water/forecast", headers={"Authorization": ""})
-    assert r.status_code == 401 and "Sign in" in r.json()["detail"]["message"]
+    assert r.status_code == 401 and "log in" in r.json()["detail"]["message"]
 
 
 def test_demo_storyline(client):
@@ -46,7 +46,7 @@ def test_bill_validation(client):
     assert r.status_code == 422 and "Check the numbers" in r.text
     client.post("/water/bills", json={"start": "2026-09-13", "end": "2026-10-13", "m3": 20})
     dup = client.post("/water/bills", json={"start": "2026-09-20", "end": "2026-10-20", "m3": 5})
-    assert dup.status_code == 409 and "overlaps" in dup.json()["detail"]["message"]
+    assert dup.status_code == 409 and "overlap it" in dup.json()["detail"]["message"]
 
 
 def test_tariff_mismatch_is_flagged(client):
@@ -60,7 +60,7 @@ def test_readings_rules(client):
     ok = client.post("/water/readings", json={"date": "2026-11-03", "index_m3": 1458})
     assert ok.status_code == 200 and ok.json()["current_cycle"]["status"] == "measured_projection"
     back = client.post("/water/readings", json={"date": "2026-11-10", "index_m3": 1455})
-    assert back.status_code == 422 and "backwards" in back.json()["detail"]["message"]
+    assert back.status_code == 422 and "only goes up" in back.json()["detail"]["message"]
 
 
 def test_goal_needs_data_and_complete_is_idempotent(client):

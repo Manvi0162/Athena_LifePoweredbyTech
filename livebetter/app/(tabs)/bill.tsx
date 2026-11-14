@@ -6,7 +6,8 @@ import {router,useLocalSearchParams} from 'expo-router';
 import {useApp} from '../../src/context';
 import {UtilityKind} from '../../src/types';
 import {C,S} from '../../src/theme';
-import {ActionRow,Btn,Card,ChoiceChips,Field,Label,Note,Page,readError} from '../../src/ui';
+import {ActionRow,Btn,Card,ChoiceChips,ErrorBox,Field,Label,Note,Page,readError} from '../../src/ui';
+import {ApiError} from '../../src/api';
 
 // One form per utility: opened from Water it is a water bill, from Electricity an electricity bill.
 // From Home ("Add a bill") the user first picks which one.
@@ -25,7 +26,8 @@ export default function BillEntry(){
 }
 
 function BillForm({kind}:{kind:UtilityKind}){
-  const {addBill,parseBill,demo}=useApp();
+  const {addBill,parseBill,demo,clearError}=useApp();
+  const [saveError,setSaveError]=useState<{text:string;overlap?:boolean}|null>(null);
   const isWater=kind==='water';
   const [start,setStart]=useState(''),[end,setEnd]=useState('');
   const [units,setUnits]=useState(''),[amount,setAmount]=useState('');
@@ -51,7 +53,7 @@ function BillForm({kind}:{kind:UtilityKind}){
       if(!isWater&&r.tariff&&['110','120','140'].includes(r.tariff))setTariff(r.tariff);
       setNote({text:t('Filled in from your photo. Check every value against the bill before saving.')+
         (r.uncertain.length?` Not sure about: ${r.uncertain.join(', ')}.`:'')});
-    }catch(e){setNote({text:`${readError(e)} You can type the values instead.`,bad:true});}
+    }catch(e){setNote({text:`${t('We could not read this photo.')} ${readError(e)} ${t('You can type the values from the bill instead.')}`,bad:true});}
     finally{setReading(false);}
   }
 
@@ -62,9 +64,11 @@ function BillForm({kind}:{kind:UtilityKind}){
     if(!units.trim()||!Number.isFinite(u)||u<=0)
       return Alert.alert(t('Consumption missing'),`Enter the ${isWater?'m³':'kWh'} shown on the bill.`);
     if(a!==undefined&&(!Number.isFinite(a)||a<=0))return Alert.alert(t('Check the amount'),t('Enter the bill amount in rupees, or leave it empty.'));
+    setSaveError(null);
     try{await addBill({kind,period_start:start,period_end:end,units:u,amount:a as number,tariff});
       router.replace(isWater?'/water':'/electricity');}
-    catch(e){Alert.alert(t('Save failed'),readError(e));}
+    catch(e){clearError();          // shown here, next to the button, instead of a pop-up plus a banner
+      setSaveError({text:readError(e),overlap:e instanceof ApiError&&e.code==='overlap'});}
   }
 
   return <Page back title={isWater?t('Add a water bill'):t('Add an electricity bill')}
@@ -77,7 +81,7 @@ function BillForm({kind}:{kind:UtilityKind}){
       </View>
       {photo?<Image source={{uri:photo}} style={{height:170,borderRadius:12}} resizeMode="contain"/>:null}
       {reading?<View style={S.row}><ActivityIndicator color={C.green}/><Note>{t('Reading your bill…')}</Note></View>:null}
-      {note?<Text style={note.bad?S.error:[S.muted,{color:C.green,fontWeight:'700'}]}>{note.text}</Text>:null}
+      {note?(note.bad?<ErrorBox text={note.text} onClose={()=>setNote(null)}/>:<Text style={[S.muted,{color:C.green,fontWeight:'700'}]}>{note.text}</Text>):null}
     </Card>
     <Card>
       <Label>{t('2 · Check the values')}</Label>
@@ -87,6 +91,8 @@ function BillForm({kind}:{kind:UtilityKind}){
       <Field label={t('Bill amount (Rs), optional')} value={amount} onChangeText={setAmount} keyboardType="decimal-pad"/>
       {isWater?null:<ChoiceChips label={t('CEB tariff on the bill')} options={['110','120','140']} value={tariff} onChange={setTariff}/>}
       <Note>Leave the amount empty and it is calculated with the official {isWater?'CWA':'CEB'} tariff. If you enter it, LiveBetter checks it against the tariff.</Note>
+      {saveError?<ErrorBox text={saveError.text} onClose={()=>setSaveError(null)}
+        action={saveError.overlap?{title:t('See my bills'),onPress:()=>router.push(isWater?'/water':'/electricity')}:undefined}/>:null}
       <Btn title={t('Save confirmed bill')} onPress={()=>void save()}/>
     </Card>
   </Page>;

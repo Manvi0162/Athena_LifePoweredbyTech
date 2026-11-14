@@ -36,6 +36,7 @@ export type Insight = { period_start: string | null; period_end: string | null; 
   // Big Brain dashboard (live backend)
   actions?: BigBrainAction[]; module_status?: Record<string, string>; outlook?: any;
   // Big Brain v3 (Manvi): plan summary + savings compared per 30 days
+  plan_effect?: PlanEffect | null;
   big_brain_summary?: string; savings_30d?: { rank: number; module: string; action_id: string; title: string;
     normalized_savings_30d_mur: number; estimated_savings_mur: number; savings_period: string; ai_explanation?: string }[] };
 export type Scenario = { baseline: number | null; adjusted: number | null; delta: number | null;
@@ -45,7 +46,11 @@ export type WhatIfChange = { module: UtilityKind; title: string; status: 'ok' | 
   how?: string; when?: string; note?: string };
 export type WhatIfBudget = { lines: { module: UtilityKind; budget_rs: number; before_rs: number; after_rs: number;
   within_before: boolean; within_after: boolean }[]; monthly_target_rs?: number | null; total_delta_rs: number };
+export type PlanEffect = { plans: number; water?: PlanBill; electricity?: PlanBill };
+export type PlanBill = { before_rs: number; after_rs: number; delta_rs: number; unit_change: number; unit: string };
+export type QuickReply = { label: string; value: string };
 export type CoachReply = { answer: string; intent: string; source: string; suggestions?: string[];
+  quick_replies?: QuickReply[]; context?: Record<string, any>; plan?: Record<string, any>[];
   changes?: WhatIfChange[]; budget?: WhatIfBudget | null; suggestion?: string | null; can_apply?: boolean;
   applied?: boolean; applied_message?: string;
   actions?: { module: string; action_id: string; title: string; estimated_savings_mur: number | null }[] };

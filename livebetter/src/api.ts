@@ -25,11 +25,31 @@ export class ApiError extends Error {
   }
 }
 
+// Messages people can act on (14 Nov). The server already words most errors; this covers the rest, so nobody sees
+// "HTTP 500", a JSON dump or a Pydantic list.
+const BY_STATUS: Record<number, string> = {
+  400: 'Something in the form is not right. Please check it and try again.',
+  401: 'Please log in again to continue.',
+  403: 'You do not have access to this.',
+  404: 'We could not find that. It may have been deleted already.',
+  413: 'The photo is too large. Please choose a smaller one.',
+  429: 'Too many tries. Please wait a minute and try again.',
+  500: 'Something went wrong on our side. Your data is safe: please try again in a moment.',
+  502: 'The server is restarting. Please try again in a few seconds.',
+  503: 'This service is busy right now. Please try again in a moment.',
+  504: 'The server took too long to answer. Please try again.',
+};
+const TECHNICAL = /traceback|exception|pydantic|sqlstate|postgrest|keyerror|typeerror|nonetype|\bjson\b|http \d{3}|internal server error|\{".*":/i;
+export function friendlyMessage(status: number, message?: string): string {
+  const m = (message || '').trim();
+  if (m && !TECHNICAL.test(m) && m.length < 400) return m;
+  return BY_STATUS[status] || (status >= 500 ? BY_STATUS[500] : 'Something did not work. Please try again.');
+}
 function errorMessage(result: any, status: number, path: string) {
   const d = result?.detail;
-  if (d && typeof d === 'object' && !Array.isArray(d)) return { message: d.message || JSON.stringify(d), code: d.code, details: d.details };
-  if (Array.isArray(d)) return { message: d.map((x: any) => x.msg).join('; '), code: 'validation_error' };
-  return { message: result?.message || (typeof d === 'string' ? d : `HTTP ${status}: ${path}`), code: result?.code };
+  if (d && typeof d === 'object' && !Array.isArray(d)) return { message: friendlyMessage(status, d.message), code: d.code, details: d.details };
+  if (Array.isArray(d)) return { message: friendlyMessage(422, d.map((x: any) => String(x.msg || '').replace('Value error, ', '')).join(' ')), code: 'validation_error' };
+  return { message: friendlyMessage(status, result?.message || (typeof d === 'string' ? d : '')), code: result?.code };
 }
 
 // Supabase access tokens expire after about an hour. On a 401 the app uses the refresh token once, saves the new
@@ -68,8 +88,8 @@ export async function request<T>(path: string, method: 'GET' | 'POST' | 'PATCH' 
     response = await fetch(`${URL}${path}`, {
       method, headers, body: body === undefined ? undefined : JSON.stringify(body), signal: controller.signal });
   } catch (e) {
-    throw Error((e as any)?.name === 'AbortError' ? 'The server took too long to answer. If it was asleep, try again in a few seconds.'
-      : `Cannot reach the server (${URL}). Check the internet connection.`);
+    throw Error((e as any)?.name === 'AbortError' ? 'The server is waking up or slow right now. Please try again in a few seconds.'
+      : 'We cannot reach LiveBetter right now. Check your internet connection and try again.');
   } finally { clearTimeout(timer); }
   let result: unknown = null;
   try { result = await response.json(); } catch {}
@@ -92,8 +112,8 @@ function xhrUpload(url: string, data: FormData, headers: Record<string, string>)
     for (const [k, v] of Object.entries(headers)) xhr.setRequestHeader(k, v);
     xhr.timeout = TIMEOUT;
     xhr.onload = () => { let body: any = null; try { body = JSON.parse(xhr.responseText); } catch {} resolve({ status: xhr.status, body }); };
-    xhr.onerror = () => reject(Error(`Cannot reach the server (${URL}). Check the internet connection.`));
-    xhr.ontimeout = () => reject(Error('The server took too long to answer. Try again.'));
+    xhr.onerror = () => reject(Error('We cannot reach LiveBetter right now. Check your internet connection and try again.'));
+    xhr.ontimeout = () => reject(Error('The server is waking up or slow right now. Please try again in a few seconds.'));
     xhr.send(data as any);
   });
 }

@@ -92,7 +92,7 @@ def me():
     ctx = require_context()
     h = household(ctx)
     if not h:
-        err(404, "no_household", "No household yet. Complete onboarding.")
+        err(404, "no_household", "Set up your household first: it takes about a minute.")
     return {"id": h["id"], "household": ui_household(h), "mode": ctx.mode}
 
 
@@ -324,6 +324,7 @@ def household_scenarios(body: UIScenario):
 class ApplyIn(BaseModel):
     question: str = Field(min_length=1, max_length=500)
     language: str = "en"
+    plan: list | None = None              # the changes discussed in the conversation (recalculated here)
 
 
 def _translate_fields(result, language):
@@ -345,7 +346,8 @@ def coach_apply(body: ApplyIn):
     """The Apply button under a what-if answer: recalculated on the server (client numbers are not trusted)."""
     from big_brain import whatif
     ctx, h = require_household()
-    return _translate_fields(whatif.apply_plan(ctx, h, body.question), body.language)
+    plan = whatif.clean_plan(body.plan) or None
+    return _translate_fields(whatif.apply_plan(ctx, h, body.question, changes=plan), body.language)
 
 
 @router.get("/household/plans")
@@ -353,6 +355,14 @@ def household_plans():
     from big_brain import whatif
     ctx, h = require_household()
     return whatif.list_plans(ctx, h)
+
+
+@router.delete("/household/plans/{plan_id}")
+def remove_household_plan(plan_id: str):
+    """Remove a change from the plan: the predicted bills go back without it."""
+    from big_brain import whatif
+    ctx, h = require_household()
+    return whatif.remove_plan(ctx, h, plan_id)
 
 
 @router.get("/household/dashboard")
@@ -377,6 +387,8 @@ def insights(explain: bool = True):
     ctx, h = require_household()
     out = insights_for_ui(build_dashboard(ctx, h, use_ai=explain))
     v3 = big_brain_v3(ctx, h, use_ai=explain)["dashboard"]
+    from big_brain import whatif
+    out["plan_effect"] = whatif.plan_effect(ctx, h)               # predicted bills WITH the changes applied in the coach
     out["big_brain_summary"] = v3["summary"]                      # Manvi v3: one-paragraph plan for Home
     out["savings_30d"] = [{k: r.get(k) for k in ("rank", "module", "action_id", "title", "normalized_savings_30d_mur",
                                                  "estimated_savings_mur", "savings_period", "ai_explanation")}
@@ -388,6 +400,7 @@ class CoachIn(BaseModel):
     message: str = Field(min_length=1, max_length=500)
     language: str = "en"
     household_id: str | None = None
+    context: dict | None = None          # what the previous coach reply returned: follow-up question, last change
 
 
 @router.post("/household/coach")
@@ -396,11 +409,10 @@ def coach(body: CoachIn):
     from big_brain import coach as C
     from big_brain import whatif
     ctx, h = require_household()
-    if whatif.wants_apply(body.message):                 # "apply it", "do it": rule-based, applied straight away
-        result = whatif.apply_plan(ctx, h, body.message)
-    else:
-        result = whatif.answer(h, body.message)
-    result = C.rephrase(result, body.language)
+    # A conversation: greetings, follow-up questions ("how many minutes?"), then the calculation, then "apply it".
+    result = whatif.converse(ctx, h, body.message, body.context)
+    if result.get("intent") == "what_if" or body.language in ("fr", "mfe"):
+        result = C.rephrase(result, body.language)
     result = _translate_fields(result, body.language)
     ctx.db.table("activity_logs").insert({"household_id": h["id"], "event_type": "coach.question",
                                           "details": {"module": "big_brain", "intent": result["intent"], "question": body.message[:200],
@@ -444,6 +456,7 @@ def _security_label(ev, d):
 
 LABELS = {
     "ai.plan_applied": lambda d: f"Plan applied from the AI coach: {d.get('question')}",
+    "ai.plan_removed": lambda d: "A change was removed from your plan",
     "receipt_confirmed": lambda d: f"Confirmed grocery purchase (Rs {d.get('total', 0):,.2f})" if d.get("total") is not None
     else "Confirmed grocery purchase",
     "recipe_cooked": lambda d: f"Cooked {d.get('recipe_name', 'a recipe')}; pantry stock reduced (no new expense)",

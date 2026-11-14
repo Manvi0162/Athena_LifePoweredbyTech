@@ -35,7 +35,7 @@ export function Page({title,subtitle,children,back=true,showSettings,stickyFoote
         </>}
       </View>
       <Text style={S.h1}>{title}</Text>{subtitle?<Text style={S.muted}>{subtitle}</Text>:null}
-      {error?<Pressable onPress={clearError}><Text style={S.error}>{error}  · Tap to dismiss</Text></Pressable>:null}
+      {error?<ErrorBox text={error} onClose={clearError}/>:null}
       {children}
     </ScrollView>
     {stickyFooter?<View style={{backgroundColor:C.white,borderTopWidth:1,borderTopColor:C.line,paddingHorizontal:18,paddingTop:10,paddingBottom:8}}>
@@ -91,6 +91,44 @@ export function ChoiceChips({label,options,value,onChange}:{label:string;options
       style={[S.choice,value===option&&S.choiceSelected]}>
       <Text style={[S.choiceText,value===option&&S.choiceTextSelected]}>{option}</Text>
     </Pressable>)}</View>
+  </View>;
+}
+// A friendly error box: icon, the message, and a clear ✕ to close it.
+export function ErrorBox({text,onClose,action}:{text:string;onClose?:()=>void;action?:{title:string;onPress:()=>void}}){
+  return <View accessibilityRole="alert" style={{flexDirection:'row',gap:10,backgroundColor:'#FDECEC',borderColor:'#F5C9C9',
+    borderWidth:1,borderRadius:16,padding:13,alignItems:'flex-start'}}>
+    <Text style={{fontSize:16}}>⚠️</Text>
+    <View style={{flex:1,gap:8}}>
+      <Text style={{color:'#8A2C2C',fontSize:14,lineHeight:20,fontWeight:'600'}}>{text}</Text>
+      {action?<Pressable accessibilityRole="button" onPress={action.onPress} style={{alignSelf:'flex-start',backgroundColor:C.white,
+        borderRadius:10,borderWidth:1,borderColor:'#F5C9C9',paddingHorizontal:12,paddingVertical:7}}>
+        <Text style={{color:C.red,fontWeight:'800'}}>{action.title}</Text></Pressable>:null}
+    </View>
+    {onClose?<Pressable accessibilityRole="button" accessibilityLabel={t('Close')} onPress={onClose} hitSlop={10}>
+      <Text style={{color:'#8A2C2C',fontWeight:'900',fontSize:16}}>✕</Text></Pressable>:null}
+  </View>;
+}
+
+// Dropdown (select): shows the chosen value, opens the list of options below it.
+export function Dropdown({label,options,value,onChange}:{label:string;options:{value:string;label:string}[];value:string;onChange:(value:string)=>void}){
+  const [open,setOpen]=useState(false);
+  const current=options.find(o=>o.value===value)||options[0];
+  return <View style={{gap:7}}>
+    <Text style={[S.muted,{fontWeight:'700'}]}>{label}</Text>
+    <Pressable accessibilityRole="combobox" accessibilityLabel={label} accessibilityState={{expanded:open}} onPress={()=>setOpen(o=>!o)}
+      style={[S.field,{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}]}>
+      <Text style={{fontSize:16,color:C.ink}}>{current?.label}</Text>
+      <Text style={{color:C.green,fontWeight:'900'}}>{open?'▴':'▾'}</Text>
+    </Pressable>
+    {open?<View style={{borderWidth:1,borderColor:C.line,borderRadius:14,backgroundColor:C.white,overflow:'hidden'}}>
+      {options.map((o,i)=><Pressable key={o.value} accessibilityRole="menuitem" accessibilityState={{selected:o.value===value}}
+        onPress={()=>{onChange(o.value);setOpen(false);}}
+        style={{paddingVertical:13,paddingHorizontal:16,borderTopWidth:i?1:0,borderTopColor:C.line,
+          backgroundColor:o.value===value?C.softGreen:C.white,flexDirection:'row',justifyContent:'space-between'}}>
+        <Text style={{fontSize:16,color:C.ink,fontWeight:o.value===value?'800':'500'}}>{o.label}</Text>
+        {o.value===value?<Text style={{color:C.green,fontWeight:'900'}}>✓</Text>:null}
+      </Pressable>)}
+    </View>:null}
   </View>;
 }
 export function Btn({title,onPress,disabled,outline,danger}:{title:string;onPress:()=>void;disabled?:boolean;outline?:boolean;danger?:boolean}){
