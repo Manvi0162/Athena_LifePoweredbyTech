@@ -1,4 +1,5 @@
 import React,{useEffect,useState} from 'react';
+import {LANGS,t} from './i18n';
 import {ActivityIndicator,Keyboard,KeyboardAvoidingView,KeyboardTypeOptions,Platform,Pressable,ScrollView,Text,TextInput,View} from 'react-native';
 import {router,usePathname} from 'expo-router';
 import {SafeAreaView} from 'react-native-safe-area-context';
@@ -27,7 +28,7 @@ export function Page({title,subtitle,children,back=true,showSettings,stickyFoote
               <Text style={S.brandInitial}>L</Text>
               <Text style={S.brandPlus}>+</Text>
             </View>
-            <View><Text style={S.brandName}>LIVEBETTER</Text><Text style={S.brandCaption}>HOUSEHOLD PLANNER</Text></View>
+            <View><Text style={S.brandName}>{t('LIVEBETTER')}</Text><Text style={S.brandCaption}>{t('HOUSEHOLD PLANNER')}</Text></View>
           </View>
           {headerRight}
           {showSettings?<Pressable accessibilityRole="button" accessibilityLabel="Open settings" onPress={()=>router.push('/settings')} style={S.topAction}><Text style={S.topActionText}>⚙</Text></Pressable>:null}
@@ -48,7 +49,7 @@ export function BottomNavigation(){
   const pathname=usePathname();
   const path=pathname.split('/').filter(Boolean).pop()||'home';
   const activeTab=path==='utilities'||path==='water'||path==='electricity'||path==='bill'||path==='habits'?'utilities'
-    :path==='pantry'||path==='receipt'||path==='pantry-updated'||path==='stock'||path==='ingredients'||path==='cook-now'||pathname.startsWith('/recipe/')?'pantry'
+    :path==='pantry'||path==='receipt'||path==='pantry-updated'||path==='stock'||path==='ingredients'||path==='cook-now'||path==='my-recipes'||pathname.startsWith('/recipe/')?'pantry'
     :path==='coach'?'coach':path==='activity'||pathname.startsWith('/activity')?'activity':'home';
   const tabs=[
     {name:'home',label:'Home',icon:'⌂'},
@@ -61,12 +62,12 @@ export function BottomNavigation(){
     {tabs.map(tab=>{
       const focused=activeTab===tab.name;
       return <Pressable key={tab.name} accessibilityRole="tab" accessibilityState={{selected:focused}}
-        accessibilityLabel={`${tab.label} tab`} onPress={()=>router.replace(`/(tabs)/${tab.name}`)}
+        accessibilityLabel={`${t(tab.label)}`} onPress={()=>router.replace(`/(tabs)/${tab.name}`)}
         style={S.bottomNavigationItem}>
         <View style={[S.tabIcon,focused&&{backgroundColor:C.mint}]}>
           <Text style={[S.tabIconText,{color:focused?C.green:C.muted}]}>{tab.icon}</Text>
         </View>
-        <Text style={{fontSize:10,fontWeight:'700',color:focused?C.green:C.muted}}>{tab.label}</Text>
+        <Text style={{fontSize:10,fontWeight:'700',color:focused?C.green:C.muted}}>{t(tab.label)}</Text>
       </Pressable>;
     })}
   </View>;
@@ -107,5 +108,16 @@ export function Field({label,value,onChangeText,placeholder,keyboardType,multili
     autoCapitalize={secureTextEntry||keyboardType==='email-address'?'none':'sentences'}/>
   </View>;
 }
-export function Loading(){return <View style={{padding:24}}><ActivityIndicator color={C.green}/><Text style={[S.muted,{textAlign:'center',marginTop:8}]}>Loading…</Text></View>;}
+export function Loading(){return <View style={{padding:24}}><ActivityIndicator color={C.green}/><Text style={[S.muted,{textAlign:'center',marginTop:8}]}>{t('Loading…')}</Text></View>;}
 export const readError=(e:unknown)=>e instanceof Error?e.message:String(e);
+
+// App language: English / Français / Kreol Morisien (forms, screens and reports).
+export function LanguagePicker(){
+  const {lang,setLanguage}=useApp();
+  return <View style={{gap:7}}>
+    <Text style={[S.muted,{fontWeight:'700'}]}>{t('App language')}</Text>
+    <View style={S.choiceRow}>{LANGS.map(l=><Pressable key={l.code} accessibilityRole="button" accessibilityState={{selected:lang===l.code}}
+      onPress={()=>void setLanguage(l.code)} style={[S.choice,lang===l.code&&S.choiceSelected]}>
+      <Text style={[S.choiceText,lang===l.code&&S.choiceTextSelected]}>{l.label}</Text></Pressable>)}</View>
+  </View>;
+}

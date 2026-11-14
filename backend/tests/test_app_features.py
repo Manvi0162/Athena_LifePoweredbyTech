@@ -113,3 +113,45 @@ def _step_up(c):
         c.put("/security/pattern", json={"pattern": [1, 2, 3, 6], "password": "demo1234"})
     return {"X-Step-Up": c.post("/security/pattern/verify", json={"pattern": [1, 2, 3, 6],
                                                                   "action": "edit_household"}).json()["step_up_token"]}
+
+
+def test_coach_cross_module_suggest_and_apply(client):
+    client.post("/households/onboarding", json={"name": "Home", "members": 3, "home_type": "House",
+                                               "monthly_target": 9000}, headers=_step_up(client))
+    client.post("/bills", json={"kind": "water", "period_start": "2026-08-13", "period_end": "2026-09-13", "units": 22})
+    client.post("/bills", json={"kind": "water", "period_start": "2026-09-13", "period_end": "2026-10-13", "units": 24})
+    client.post("/bills", json={"kind": "electricity", "period_start": "2026-09-01", "period_end": "2026-10-01", "units": 260})
+    r = client.post("/household/coach", json={"message": "What if we shower 3 minutes less every day?"}).json()
+    assert [c["module"] for c in r["changes"]] == ["water", "electricity"]
+    assert r["changes"][1]["status"] == "needs_bill"                       # water heating not answered yet
+    client.put("/habits/electricity", json={"E3": "electric"})
+    r = client.post("/household/coach", json={"message": "What if we shower 3 minutes less every day?"}).json()
+    assert [c["status"] for c in r["changes"]] == ["ok", "ok"] and r["changes"][1]["delta_rs"] < 0
+    assert r["suggestion"].startswith("My suggestion") and r["can_apply"] and not r["apply_requested"]
+    g = client.post("/household/coach", json={"message": "What if 2 guests stay for 5 days?"}).json()
+    assert {c["module"] for c in g["changes"]} == {"water", "electricity"}
+    a = client.post("/household/coach", json={"message": "Switch off standby, apply it now"}).json()
+    assert a["applied"] and "Applied" in a["applied_message"]
+    b = client.post("/household/coach/apply", json={"question": "What if we use the AC 1 hour less a day?"}).json()
+    assert b["applied"]
+    plans = client.get("/household/plans").json()
+    assert len(plans) == 2 and plans[0]["changes"]
+    acts = client.get("/electricity/actions").json()
+    assert any(x["key"] == "standby_off" for x in acts)
+    act = client.get("/activity").json()
+    assert any(x["category"] == "ai" and "Plan applied" in x["message"] for x in act)
+
+
+def test_ai_recipe_save_then_cook_lowers_stock(client):
+    import uuid
+    client.post("/receipts/confirm", json={"source_identifier": "t-1", "total": 100, "items": [
+        {"original_name": "Rice", "normalized_name": "rice", "quantity": 2, "unit": "kg", "line_total": 100}]})
+    recipe = {"name": "AI rice bowl", "cuisine": "Mauritian-inspired", "servings": 2, "description": "test",
+              "ingredients": [{"ingredient_name": "rice", "quantity": 0.5, "unit": "kg", "optional": False}],
+              "instructions": ["Cook the rice."]}
+    rid = client.post("/recipes/drafts", json={"recipe": recipe}).json()["recipe_id"]
+    mine = [r for r in client.get("/recipes/ranked").json()["recipes"] if r["id"] == rid]
+    assert mine and mine[0]["verification_status"] == "pending"
+    assert client.post(f"/recipes/{rid}/cook", json={"operation_id": str(uuid.uuid4())}).status_code == 200
+    rice = [p for p in client.get("/pantry").json()["items"] if p["ingredient_name"] == "rice"][0]
+    assert float(rice["quantity"]) == 1.5

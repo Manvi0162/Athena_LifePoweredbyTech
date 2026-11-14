@@ -1,4 +1,5 @@
 import React,{useCallback,useEffect,useMemo,useState} from 'react';
+import {t} from '../../src/i18n';
 import {Alert,Platform,Pressable,ScrollView,Text,View} from 'react-native';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
@@ -48,7 +49,7 @@ function makeReportHtml(entries:ActivityEntry[],start:string,end:string,filter:A
     <td>${escapeHtml(entry.kind.toUpperCase())}</td>
     <td>${escapeHtml(entry.message)}</td>
   </tr>`).join('');
-  return `<!doctype html><html><head><meta charset="utf-8"><title>Household activity</title>
+  return `<!doctype html><html><head><meta charset="utf-8"><title>{t('Household activity')}</title>
     <style>
       body{font-family:Arial,sans-serif;color:#0B2433;margin:32px}
       h1{margin-bottom:6px}p{color:#526777}
@@ -56,10 +57,10 @@ function makeReportHtml(entries:ActivityEntry[],start:string,end:string,filter:A
       th,td{text-align:left;padding:10px;border-bottom:1px solid #DCE8EB;vertical-align:top}
       th{background:#EAF4F8}
     </style></head><body>
-    <h1>LiveBetter · Household activity</h1>
-    <p>${escapeHtml(CATEGORY_INFO[filter].title)} · ${escapeHtml(toDisplayDate(start))} to ${escapeHtml(toDisplayDate(end))}</p>
-    <table><thead><tr><th>Date and time</th><th>Activity</th><th>Details</th></tr></thead>
-    <tbody>${rows||'<tr><td colspan="3">No activity was recorded for this period.</td></tr>'}</tbody></table>
+    <h1>${escapeHtml(t('LiveBetter · Household activity'))}</h1>
+    <p>${escapeHtml(t(CATEGORY_INFO[filter].title))} · ${escapeHtml(toDisplayDate(start))} → ${escapeHtml(toDisplayDate(end))}</p>
+    <table><thead><tr><th>${t('Date and time')}</th><th>${t('Activity')}</th><th>${t('Details')}</th></tr></thead>
+    <tbody>${rows||'<tr><td colspan="3">'+t('No activity was recorded for this period.')+'</td></tr>'}</tbody></table>
     </body></html>`;
 }
 
@@ -72,8 +73,8 @@ function groupLabel(isoDate:string,today:string){
   previous.setDate(previous.getDate()-1);
   const yesterday=toIsoDate(previous);
   const dateLabel=`${String(day).padStart(2,'0')} ${months[month-1]}`.toUpperCase();
-  if(isoDate===today)return `TODAY · ${dateLabel}`;
-  if(isoDate===yesterday)return `YESTERDAY · ${dateLabel}`;
+  if(isoDate===today)return `${t('TODAY')} · ${dateLabel}`;
+  if(isoDate===yesterday)return `${t('YESTERDAY')} · ${dateLabel}`;
   return `${date.toLocaleDateString(undefined,{weekday:'long'}).toUpperCase()} · ${dateLabel}`;
 }
 
@@ -197,23 +198,23 @@ export default function ActivityDetail(){
         await Sharing.shareAsync(file.uri,{mimeType:'application/pdf',dialogTitle:'Export household activity'});
       }
     }catch(error){
-      Alert.alert('Could not export activity',error instanceof Error?error.message:String(error));
+      Alert.alert(t('Could not export activity'),error instanceof Error?error.message:String(error));
     }finally{
       setExporting(false);
     }
   }
 
   return <Page back hideBrand headerRight={<View style={S.activityHeaderRight}>
-    <View style={S.activityAuditTag}><Text style={S.activityAuditTagText}>AUDIT TRAIL</Text></View>
-  </View>} title={info.title} subtitle={info.about}>
+    <View style={S.activityAuditTag}><Text style={S.activityAuditTagText}>{t('AUDIT TRAIL')}</Text></View>
+  </View>} title={t(info.title)} subtitle={t(info.about)}>
     {filter==='ai'?<View style={[S.card,{gap:0}]}>
-      <Label>Recommended now</Label>
-      {recs===null?<Note>{demo?'Recommendations come from the backend (live mode).':'Loading…'}</Note>:recs.length?recs.slice(0,8).map((a,i)=>
+      <Label>{t('Recommended now')}</Label>
+      {recs===null?<Note>{demo?t('Recommendations come from the backend (live mode).'):t('Loading…')}</Note>:recs.length?recs.slice(0,8).map((a,i)=>
         <View key={`${a.module}:${a.action_id}`} style={{paddingVertical:10,borderTopWidth:i?1:0,borderTopColor:'#DCE8EB',gap:3}}>
           <View style={S.between}><Text style={[S.title,{flex:1}]}>{i+1}. {a.title}</Text>
             {a.estimated_savings_mur?<Text style={{color:'#079C89',fontWeight:'800'}}>{money(a.estimated_savings_mur)}</Text>:null}</View>
           <Text style={S.muted}>{a.module.toUpperCase()} · {a.explanation}</Text>
-        </View>):<Note>No recommendations yet. Add bills and scan receipts.</Note>}
+        </View>):<Note>{t('No recommendations yet. Add bills and scan receipts.')}</Note>}
     </View>:null}
 
 
@@ -221,16 +222,16 @@ export default function ActivityDetail(){
       <View style={S.periodHeader}>
         <View style={S.row}>
           <Text style={S.periodIcon}>▦</Text>
-          <Label>Period</Label>
+          <Label>{t('Period')}</Label>
         </View>
         <Pressable accessibilityRole="button" disabled={exporting} onPress={()=>void exportPdf()}
           style={[S.exportButton,exporting&&{opacity:0.6}]}>
-          <Text style={S.exportButtonText}>{exporting?'Preparing…':'⇩  Export PDF'}</Text>
+          <Text style={S.exportButtonText}>{exporting?t('Preparing…'):'⇩  Export PDF'}</Text>
         </Pressable>
       </View>
       <View style={S.periodControls}>
         <View style={S.periodDateField}>
-          <Text style={S.periodDateLabel}>From</Text>
+          <Text style={S.periodDateLabel}>{t('From')}</Text>
           <Pressable accessibilityRole="button" accessibilityLabel={`Choose start date, ${draftStart}`}
             accessibilityHint="Opens a calendar to choose the start date" accessibilityState={{expanded:calendarTarget==='start'}}
             onPress={()=>openCalendar('start')} style={S.periodDateInput}>
@@ -239,7 +240,7 @@ export default function ActivityDetail(){
           </Pressable>
         </View>
         <View style={S.periodDateField}>
-          <Text style={S.periodDateLabel}>To</Text>
+          <Text style={S.periodDateLabel}>{t('To')}</Text>
           <Pressable accessibilityRole="button" accessibilityLabel={`Choose end date, ${draftEnd}`}
             accessibilityHint="Opens a calendar to choose the end date" accessibilityState={{expanded:calendarTarget==='end'}}
             onPress={()=>openCalendar('end')} style={S.periodDateInput}>
@@ -248,7 +249,7 @@ export default function ActivityDetail(){
           </Pressable>
         </View>
         <Pressable accessibilityRole="button" onPress={applyRange} style={S.applyButton}>
-          <Text style={S.applyButtonText}>Apply</Text>
+          <Text style={S.applyButtonText}>{t('Apply')}</Text>
         </Pressable>
       </View>
       {calendarTarget?<View style={S.calendarPopup}>
@@ -278,7 +279,7 @@ export default function ActivityDetail(){
             </Pressable>
             <Pressable accessibilityRole="button" accessibilityLabel="Close calendar"
               onPress={()=>setCalendarTarget(null)} style={S.calendarCloseButton}>
-              <Text style={S.calendarCloseText}>Close</Text>
+              <Text style={S.calendarCloseText}>{t('Close')}</Text>
             </Pressable>
           </View>
         </View>
@@ -338,6 +339,6 @@ export default function ActivityDetail(){
           </View>
         </View>;
       })}
-    </View>):<Card><Note>No activity was recorded for this category and period.</Note></Card>}
+    </View>):<Card><Note>{t('No activity was recorded for this category and period.')}</Note></Card>}
   </Page>;
 }
