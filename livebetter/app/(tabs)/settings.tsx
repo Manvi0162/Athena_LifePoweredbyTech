@@ -1,48 +1,77 @@
-import React,{useState} from 'react';
+import React,{useCallback,useEffect,useState} from 'react';
+import {t} from '../../src/i18n';
 import {Text,View} from 'react-native';
-import {router} from 'expo-router';
+import {router,useFocusEffect} from 'expo-router';
 import {useApp} from '../../src/context';
+import {usePattern} from '../../src/pattern';
+import {ResetStatus,SecurityStatus} from '../../src/types';
 import {C,S} from '../../src/theme';
-import {ActionRow,Btn,Card,Label,Note,Page} from '../../src/ui';
+import {ActionRow,Btn,Card,Label,LanguagePicker,Note,Page,readError} from '../../src/ui';
 
 export default function Settings(){
-  const {state,demo,clearDemo}=useApp();
-  const [confirmReset,setConfirmReset]=useState(false);
-  const [resetError,setResetError]=useState<string|null>(null);
-  return <Page back title="Settings" subtitle="Your household and app preferences.">
+  const app=useApp();const {state,demo}=app;
+  const guard=usePattern();
+  const [sec,setSec]=useState<SecurityStatus|null>(null);
+  const [reset,setReset]=useState<ResetStatus|null>(null);
+  const [msg,setMsg]=useState<{text:string;bad?:boolean}|null>(null);
+
+  const load=useCallback(async()=>{
+    if(demo)return;
+    try{const [s,r]=await Promise.all([app.securityStatus(),app.resetStatus()]);setSec(s);setReset(r);}
+    catch(e){setMsg({text:readError(e),bad:true});}
+  },[demo,app.securityStatus,app.resetStatus]);
+  useFocusEffect(useCallback(()=>{void load();},[load]));
+  useEffect(()=>{void load();},[state.bills.length,load]);
+
+  const resetAccount=()=>guard.ask('reset_account',async tok=>{
+    try{setMsg({text:await app.resetAccount(tok)});}catch(e){setMsg({text:readError(e),bad:true});}
+    await load();
+  });
+  const restore=()=>guard.ask('restore_account',async tok=>{
+    try{setMsg({text:await app.restoreAccount(tok)});}catch(e){setMsg({text:readError(e),bad:true});}
+    await load();
+  });
+
+  return <Page back title={t('Settings')} subtitle={t('Your household and app preferences.')}>
+    {guard.prompt}
+    {msg?<Text accessibilityLiveRegion="polite" style={msg.bad?S.error:[S.card,{color:C.green,fontWeight:'700'}]}>{msg.text}</Text>:null}
     <Card>
-      <Label>Household details</Label>
+      <Label>{t('Household details')}</Label>
       <Note>{state.household?.name||'Household'} · {state.household?.members||0} people · {state.household?.home_type||'Home not set'}</Note>
-      <ActionRow icon="⌂" title="Household assessment" subtitle="Update your household details"
+      <ActionRow icon="⌂" title={t('Household assessment')} subtitle={demo?t('Update your household details'):t('Update your household details (pattern needed)')}
         onPress={()=>router.push('/onboarding')}/>
     </Card>
+
     <Card>
-      <Label>Language</Label>
-      <View style={[S.between,{paddingVertical:11,borderBottomWidth:1,borderBottomColor:C.line}]}>
-        <Text style={S.body}>English</Text><Text style={{color:C.green,fontWeight:'800'}}>ACTIVE</Text>
-      </View>
-      <Text style={S.body}>Français · Kreol Morisien</Text>
-      <Note>Additional language translations are not enabled in this app build.</Note>
+      <Label>{t('Language')}</Label>
+      <LanguagePicker/>
+      <Note>{t('Forms, screens and reports use this language. Calculated numbers stay the same.')}</Note>
     </Card>
+
     <Card>
-      <Label>History and activity</Label>
-      <ActionRow icon="◷" title="Household activity" subtitle="Bills, receipts and pantry updates"
-        onPress={()=>router.push('/activity')}/>
+      <Label>{t('Security')}</Label>
+      {sec?.alert?<Text style={[S.body,{color:C.red,fontWeight:'700'}]}>⚠ {sec.alert.message}</Text>:null}
+      <ActionRow icon="⬡" title={t('Security pattern and Microsoft Authenticator')}
+        subtitle={demo?t('Needs the backend (live mode)'):`Pattern ${sec?.pattern_set?'set':t('NOT set')} · Authenticator ${sec?.authenticator_on?'on':'off'}`}
+        onPress={()=>router.push('/security')}/>
     </Card>
-    <Card>
-      <Label>Your data</Label>
-      <Note>{demo?'Demo records are stored on this device.':'Household records are sent to the configured API.'} Do not enter sensitive personal details in this preview.</Note>
-      {demo?<View style={{gap:9}}>
-        {confirmReset?<View style={{gap:8,backgroundColor:C.dangerBg,borderRadius:14,padding:12}}>
-          <Text style={{color:C.red,fontWeight:'700'}}>This removes local bills, receipts and pantry changes.</Text>
-          {resetError?<Text style={{color:C.red}}>{resetError}</Text>:null}
-          <Btn title="Confirm reset" danger onPress={async()=>{
-            try{await clearDemo();router.replace('/welcome');}
-            catch(error){setResetError(String(error));}
-          }}/>
-          <Btn title="Cancel" outline onPress={()=>{setConfirmReset(false);setResetError(null);}}/>
-        </View>:<Btn title="Reset local demo data" danger onPress={()=>setConfirmReset(true)}/>}
+
+    {!demo?<Card>
+      <Label>{t('Account')}</Label>
+      {reset?.restorable?<View style={{gap:8,backgroundColor:C.amber,borderRadius:14,padding:12}}>
+        <Text style={S.title}>Your account was reset on {new Date(reset.reset_at!).toLocaleString()}.</Text>
+        <Note>Your records can be restored until {new Date(reset.restore_until!).toLocaleString()}.</Note>
+        <Btn title={t('Restore my records (pattern)')} onPress={restore}/>
       </View>:null}
-    </Card>
+      <Note>{t('Reset hides all bills, receipts, pantry and goals. It needs your pattern and can be undone for 24 hours.')}</Note>
+      <Btn title={t('Reset account (pattern)')} danger onPress={resetAccount}/>
+      {!state.bills.length?<Btn title={t('Load sample household (fictional data)')} outline
+        onPress={()=>void app.loadSample().then(load).catch(e=>setMsg({text:readError(e),bad:true}))}/>:null}
+      <Btn title={t('Sign out')} outline onPress={()=>void app.logout().then(()=>router.replace('/welcome'))}/>
+    </Card>:<Card>
+      <Label>{t('Demo data')}</Label>
+      <Btn title={t('Reset demo data')} outline onPress={()=>void app.clearDemo()}/>
+    </Card>}
+
   </Page>;
 }

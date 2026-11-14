@@ -1,101 +1,124 @@
 import React,{useEffect,useMemo,useState} from 'react';
+import {t} from '../i18n';
 import {ActivityIndicator,Alert,Pressable,Text,View} from 'react-native';
 import {router} from 'expo-router';
 import {useApp} from '../context';
-import {Forecast,Scenario,UtilityKind} from '../types';
+import {usePattern} from '../pattern';
+import {Explanation,Forecast,Habits,UtilityKind} from '../types';
 import {money,S,C} from '../theme';
-import {Btn,Card,Field,Label,Note,Page} from '../ui';
+import {Btn,Card,Label,Note,Page,readError} from '../ui';
 
+// Same layout for water and electricity:
+// next billing cycle -> explainable AI (why this estimate) -> past billing cycles -> habits.
 export function UtilityDetail({kind}:{kind:UtilityKind}){
-  const {state,forecast,scenario}=useApp();
+  const {state,forecast,explain,habits,deleteBill,demo}=useApp();
+  const guard=usePattern();   // deleting a bill removes evidence: the pattern is required
   const [data,setData]=useState<Forecast|null>(null);
-  const [result,setResult]=useState<Scenario|null>(null);
-  const [reduction,setReduction]=useState('10');
+  const [why,setWhy]=useState<Explanation|null>(null);
+  const [hab,setHab]=useState<Habits|null>(null);
   const [loading,setLoading]=useState(true);
+  const isWater=kind==='water';
+  const unit=isWater?'m³':'kWh';
   const bills=useMemo(()=>state.bills.filter(bill=>bill.kind===kind)
     .sort((a,b)=>a.period_start.localeCompare(b.period_start)),[state.bills,kind]);
-  const isWater=kind==='water';
 
   useEffect(()=>{
     let active=true;
-    forecast(kind).then(value=>{if(active)setData(value);})
-      .catch(error=>{if(active)Alert.alert('Forecast unavailable',String(error));})
-      .finally(()=>{if(active)setLoading(false);});
+    setLoading(true);
+    forecast(kind).then(v=>{if(active)setData(v);}).catch(()=>undefined).finally(()=>{if(active)setLoading(false);});
+    if(!demo){
+      explain(kind).then(v=>{if(active)setWhy(v);}).catch(()=>undefined);
+      habits(kind).then(v=>{if(active)setHab(v);}).catch(()=>undefined);
+    }
     return()=>{active=false;};
-  },[forecast,kind,state]);
+  },[forecast,explain,habits,kind,state,demo]);
 
-  async function runScenario(){
-    const percent=Number(reduction);
-    if(!Number.isFinite(percent)||percent<=0||percent>=100)return;
-    try{setResult(await scenario('water',percent));}
-    catch(error){console.warn('Could not calculate water scenario',error);}
-  }
-
+  const remove=(id:string)=>{
+    const bill=bills.find(b=>b.id===id);if(!bill)return;
+    guard.ask('delete_bill',async tok=>{try{await deleteBill(bill,tok);}catch(e){Alert.alert(t('Not deleted'),readError(e));}});
+  };
   const maxUnits=Math.max(1,...bills.map(bill=>bill.units));
-  return <Page back title={isWater?'Water intelligence':'Electricity insights'}
-    subtitle={isWater?'Understand your water use and upcoming bill.':'See your electricity trend and recorded bills.'}>
-    {loading?<ActivityIndicator color={C.green}/>:null}
-    <View style={[S.heroCard,{backgroundColor:isWater?'#176E78':'#71542B'}]}>
+  const answered=hab?hab.questions.filter(q=>{const v=hab.answers[q.id];return Array.isArray(v)?v.length>0:v!=null&&v!=='';}):[];
+
+  return <Page back title={isWater?t('Water'):t('Electricity')}
+    subtitle={isWater?t('Your next water bill, why we expect it, and your history.'):t('Your next electricity bill, why we expect it, and your history.')}>
+    {guard.prompt}
+    <View style={[S.heroCard,{backgroundColor:isWater?'#176E78':'#245C91'}]}>
       <View style={S.between}>
-        <Text style={S.heroEyebrow}>{isWater?'NEXT BILLING CYCLE · HISTORICAL BASELINE':'NEXT BILLING CYCLE · RECORDED BASELINE'}</Text>
-        <Text style={{fontSize:10,fontWeight:'800',color:'#E8F4F4'}}>ESTIMATE</Text>
+        <Text style={S.heroEyebrow}>{t('NEXT BILLING CYCLE')}</Text>
+        <Text style={{fontSize:10,fontWeight:'800',color:'#E8F4F4'}}>{t('ESTIMATE')}</Text>
       </View>
-      <Text style={{fontSize:30,fontWeight:'800',color:C.white}}>{data?.value==null?'No forecast yet':money(data.value)}</Text>
-      <Text style={S.heroFootnote}>{data?`${data.units} ${data.unit} projected from prior cycles`:'Add a bill to start your household baseline.'}</Text>
-      <Text style={S.heroFootnote}>{data?.confidence==='unavailable'?'No verified bill history yet':`Confidence: ${data?.confidence||'loading'}`}</Text>
+      {loading?<ActivityIndicator color={C.white}/>:<>
+        <Text style={{fontSize:30,fontWeight:'800',color:C.white}}>{data?.value==null?t('No forecast yet'):money(data.value)}</Text>
+        <Text style={S.heroFootnote}>{data?.value!=null?`${data.units} ${unit} · ${data.period_start} to ${data.period_end}`:
+          (data?.status_message||`Add a ${kind} bill to start your baseline.`)}</Text>
+        {data?.cost_range?<Text style={S.heroFootnote}>Likely between {money(data.cost_range.low)} and {money(data.cost_range.high)}</Text>:null}
+      </>}
     </View>
 
     <Card>
-      <View style={S.between}><Label>{isWater?'Past billing cycles':'Electricity usage history'}</Label><Text style={S.muted}>{bills.length} records</Text></View>
-      {bills.length?<View style={{height:132,flexDirection:'row',alignItems:'flex-end',justifyContent:'space-around',gap:10,paddingTop:12}}>
-        {bills.slice(-6).map(bill=><View key={bill.id} style={{flex:1,alignItems:'center',justifyContent:'flex-end',gap:7,height:'100%'}}>
-          <View style={{width:'70%',maxWidth:34,height:Math.max(14,bill.units/maxUnits*86),borderRadius:7,backgroundColor:bill===bills[bills.length-1]?C.green:(isWater?'#8ACFD0':'#E3B95B')}}/>
-          <Text style={[S.muted,{fontSize:10}]}>{bill.period_start.slice(5,7)}/{bill.period_start.slice(2,4)}</Text>
-        </View>)}
-      </View>:<View style={{borderRadius:14,backgroundColor:C.bg,padding:14}}>
-        <Note>No bill history yet. Add a verified bill to start your household baseline.</Note>
-      </View>}
-      {bills.slice(-3).reverse().map(bill=><View key={bill.id} style={{paddingVertical:9,borderTopWidth:1,borderTopColor:C.line}}>
-        <View style={S.between}><Text style={S.body}>{bill.period_start} – {bill.period_end}</Text><Text style={S.title}>{money(bill.amount)}</Text></View>
-        <Note>{bill.units} {isWater?'m³':'kWh'} · {bill.tariff}</Note>
-      </View>)}
-      <Btn title={isWater?'Add a water bill':'Add an electricity bill'} onPress={()=>router.push({pathname:'/bill',params:{kind}})}/>
+      <View style={S.between}><Label>{t('Why this estimate')}</Label>
+        <View style={S.tag}><Text style={S.tagText}>{t('EXPLAINABLE AI')}</Text></View></View>
+      {demo?<Note>Explanations come from the backend (live mode).</Note>:!why?<ActivityIndicator color={C.green}/>:<>
+        <Text style={S.body}>{why.summary}</Text>
+        {why.factors.length?<View style={{borderWidth:1,borderColor:C.line,borderRadius:14,overflow:'hidden'}}>
+          {why.factors.map((f,i)=><View key={f.label} style={{flexDirection:'row',padding:10,gap:10,
+            backgroundColor:i%2?C.white:C.bg}}>
+            <Text style={[S.muted,{width:105,fontWeight:'700'}]}>{f.label}</Text>
+            <View style={{flex:1}}><Text style={S.title}>{f.value}</Text><Text style={S.muted}>{f.detail}</Text></View>
+          </View>)}
+        </View>:null}
+        {why.breakdown.length?<View style={{gap:4}}>
+          <Text style={S.title}>{t('How the bill is calculated')}</Text>
+          {why.breakdown.map(b=><View key={b.label} style={S.between}>
+            <Text style={[S.muted,{flex:1}]}>{b.label}{b.how&&b.how!=='fixed'?` · ${b.how}`:''}</Text>
+            <Text style={S.title}>{money(b.rs)}</Text></View>)}
+        </View>:null}
+        {why.to_improve.length?<View style={{gap:3,backgroundColor:C.softAmber,borderRadius:12,padding:11}}>
+          <Text style={S.title}>{t('To make it more accurate')}</Text>
+          {why.to_improve.map((t,i)=><Note key={i}>• {t}</Note>)}
+        </View>:null}
+        <Note>{why.summary_source==='gemini'?t('Written by AI from the calculated figures (numbers checked).'):
+          'Calculated by LiveBetter from your bills and the official tariff.'}</Note>
+      </>}
     </Card>
 
-    {isWater?<Card>
-      <Label>How was this estimated?</Label>
-      <Pressable accessibilityRole="button" onPress={()=>router.push({pathname:'/bill',params:{kind:'water'}})} style={S.actionRow}>
-        <View style={S.actionIcon}><Text style={S.actionIconText}>▣</Text></View>
-        <View style={{flex:1,gap:2}}><Text style={S.title}>Recorded bill history</Text><Text style={S.muted}>{data?.source_data.length||0} source bills used</Text></View>
-        <Text style={S.actionArrow}>›</Text>
-      </Pressable>
-      <View style={{gap:5}}><Text style={S.title}>Estimation method</Text><Note>{data?.method||'Add a bill to see the estimate method'}</Note></View>
-      {data?.assumptions.map((assumption,index)=><Note key={index}>• {assumption}</Note>)}
-      <Note>A past bill does not measure current meter usage.</Note>
-    </Card>:<Card>
-      <Label>About this baseline</Label>
-      <Note>{data?.method||'The estimate will appear after you record a bill.'}</Note>
-      {data?.assumptions.map((assumption,index)=><Note key={index}>• {assumption}</Note>)}
-      <Note>This screen shows recorded history; the demo does not calculate appliance savings or a live meter reading.</Note>
-    </Card>}
+    <Card>
+      <View style={S.between}><Label>{t('Past billing cycles')}</Label><Text style={S.muted}>{bills.length} bills</Text></View>
+      {bills.length?<View style={{height:120,flexDirection:'row',alignItems:'flex-end',justifyContent:'space-around',gap:10,paddingTop:8}}>
+        {bills.slice(-6).map(bill=><View key={bill.id} style={{flex:1,alignItems:'center',justifyContent:'flex-end',gap:7,height:'100%'}}>
+          <View style={{width:'70%',maxWidth:34,height:Math.max(14,bill.units/maxUnits*80),borderRadius:7,
+            backgroundColor:isWater?(bill===bills[bills.length-1]?C.green:'#8ACFD0'):(bill===bills[bills.length-1]?'#3274B8':'#A8C8E8')}}/>
+          <Text style={[S.muted,{fontSize:10}]}>{bill.period_start.slice(5,7)}/{bill.period_start.slice(2,4)}</Text>
+        </View>)}
+      </View>:<Note>{t('No bills yet. Add one to start your baseline.')}</Note>}
+      {[...bills].reverse().map(bill=><View key={bill.id} style={{flexDirection:'row',alignItems:'center',gap:10,paddingVertical:9,borderTopWidth:1,borderTopColor:C.line}}>
+        <View style={{flex:1}}>
+          <Text style={S.body}>{bill.period_start} – {bill.period_end}</Text>
+          <Note>{bill.units} {unit}{bill.amount_source==='tariff_calculation'?' · amount calculated with the tariff':''}</Note>
+        </View>
+        <Text style={S.title}>{money(bill.amount)}</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel={`Delete bill ${bill.period_start}`} onPress={()=>remove(bill.id)}
+          hitSlop={8} style={{width:24,height:24,borderRadius:12,backgroundColor:C.dangerBg,alignItems:'center',justifyContent:'center'}}>
+          <Text style={{color:C.red,fontWeight:'900',fontSize:12}}>✕</Text></Pressable>
+      </View>)}
+      <Btn title={isWater?'＋ Add a water bill':'＋ Add an electricity bill'} onPress={()=>router.push({pathname:'/bill',params:{kind}})}/>
+    </Card>
 
-    {isWater?<Card>
-      <Label>Try one change</Label>
-      <Note>Explore a hypothetical water-use reduction. Savings are illustrative, not a verified tariff quote.</Note>
-      <Field label="Usage reduction (%)" value={reduction} onChangeText={setReduction} keyboardType="decimal-pad"/>
-      <Btn title="Open water-saving scenario" onPress={runScenario}/>
-      {result?<View style={{gap:7,backgroundColor:C.softGreen,borderRadius:14,padding:13}}>
-        <Text style={S.title}>{result.message}</Text>
-        <Note>Baseline: {money(result.baseline)} · Scenario: {money(result.adjusted)}</Note>
-        <Note>Estimated difference: {money(result.delta)}</Note>
-        {result.assumptions.map((assumption,index)=><Note key={index}>• {assumption}</Note>)}
-      </View>:null}
-    </Card>:null}
-
-    {isWater?<Card>
-      <Label>Your water habits</Label>
-      <Note>{state.household?.water_habit||'Add optional notes about household water use.'}</Note>
-      <Btn title="Edit household assessment" outline onPress={()=>router.push('/onboarding')}/>
-    </Card>:null}
+    <Card>
+      <View style={S.between}><Label>{isWater?t('Your water habits'):t('Your appliances and habits')}</Label>
+        {hab?<Text style={S.muted}>{answered.length}/{hab.questions.length} answered</Text>:null}</View>
+      {hab&&answered.length?answered.map(q=>{
+        const v=hab.answers[q.id];
+        const label=(x:string)=>q.options.find(o=>o.value===x)?.label||x;
+        return <View key={q.id} style={{gap:1}}>
+          <Text style={S.muted}>{q.question}</Text>
+          <Text style={S.title}>{Array.isArray(v)?v.map(label).join(', '):label(String(v))}</Text>
+        </View>;
+      }):<Note>{isWater?t('Tell us about showers, laundry and outdoor use: it personalises your estimate and unlocks calculated savings.'):
+        'Tell us which appliances you use: it personalises your estimate and unlocks calculated savings.'}</Note>}
+      <Btn title={isWater?t('Edit water habits'):t('Edit appliances and habits')} outline
+        onPress={()=>router.push({pathname:'/habits',params:{kind}})}/>
+    </Card>
   </Page>;
 }

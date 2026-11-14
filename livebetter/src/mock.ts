@@ -116,7 +116,7 @@ export function mockInsights(s:Snapshot):Insight {
       'Groceries are actual confirmed purchases, not a forecast. Cooking never adds a second expense.',
       'Utility monetary baselines are historical averages, NOT current official slab calculations.'],
     recommendations:[
-      'Check pantry stock before shopping; use ingredients near their expiry dates.',
+      'Check pantry stock before shopping; use what you already have first.',
       'Provide multiple historical bills for stronger utility baselines.',
       'Test water/appliance usage scenarios with the official tariff engine when integrated.'
     ],source_data:[...water.source_data,...elec.source_data,...s.receipts.map(r=>r.id)]};
@@ -126,5 +126,5 @@ export function mockScenario(s:Snapshot,category:UtilityKind,percent:number):Sce
   return {baseline:f.value,adjusted:null,delta:null,
     unit_change:f.value==null?null:Number((f.units*percent/100).toFixed(2)),
     message:'Illustrative consumption change only. Verified tariff-based cost savings require the backend utility engine.',
-    assumptions:[`${percent}% hypothetical reduction in ${category} usage`,'No tariff-based money saving calculated in offline demo mode']};
+    assumptions:[`${percent}% hypothetical reduction in ${category} usage`,'No tariff-based money saving calculated.']};
 }

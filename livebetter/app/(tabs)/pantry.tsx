@@ -1,124 +1,55 @@
 import React,{useEffect,useState} from 'react';
-import {Alert,Pressable,Text,View} from 'react-native';
+import {t} from '../../src/i18n';
+import {Pressable,Text,View} from 'react-native';
 import {router} from 'expo-router';
 import {useApp} from '../../src/context';
-import {PantryItem,Recipe} from '../../src/types';
-import {S,C} from '../../src/theme';
-import {ActionRow,Btn,Card,Field,Label,Loading,Note,Page} from '../../src/ui';
+import {Recipe} from '../../src/types';
+import {money,S,C} from '../../src/theme';
+import {Card,Label,Loading,Note,Page} from '../../src/ui';
 
+// Same pattern as Utilities: one card per feature, "View details" opens it.
 export default function Pantry(){
-  const {state,addItem,recipes,demo,refreshPantry}=useApp();
+  const {state,recipes,demo,refreshPantry,insights}=useApp();
   const [list,setList]=useState<Recipe[]|null>(null);
-  const [editing,setEditing]=useState<string|null>(null);
-  const [formOpen,setFormOpen]=useState(false);
-  const [search,setSearch]=useState('');
-  const [name,setName]=useState('');
-  const [qty,setQty]=useState('1');
-  const [unit,setUnit]=useState('piece');
-  const [expiry,setExpiry]=useState('');
+  const [spent,setSpent]=useState<number|null>(null);
   const available=state.pantry.filter(item=>item.available&&item.quantity>0);
-  const filteredRecipes=(list||[]).filter(recipe=>recipe.name.toLowerCase().includes(search.trim().toLowerCase()));
-
+  useEffect(()=>{if(!demo)refreshPantry().catch(()=>undefined);},[demo,refreshPantry]);
   useEffect(()=>{
     let active=true;
-    recipes().then(value=>{if(active)setList(value);})
-      .catch(error=>{if(active){setList([]);Alert.alert('Recipes unavailable',String(error));}});
+    recipes().then(v=>{if(active)setList(v);}).catch(()=>{if(active)setList([]);});
+    insights().then(v=>{if(active)setSpent(v.groceries_recorded);}).catch(()=>undefined);
     return()=>{active=false;};
-  },[recipes,state]);
+  },[recipes,insights,state]);
+  const ready=(list||[]).filter(r=>r.cook_now);
 
-  useEffect(()=>{if(!demo)refreshPantry().catch(error=>Alert.alert('Pantry unavailable',String(error)));},[demo,refreshPantry]);
+  return <Page title={t('Your smart pantry')} subtitle={t('What you have, what you can cook, and what to do with it.')} showSettings>
+    <Pressable accessibilityRole="button" onPress={()=>router.push('/stock')}
+      style={{padding:16,borderRadius:18,backgroundColor:C.softGreen,gap:8}}>
+      <View style={S.between}><Text style={S.title}>{t('▤  Groceries and stock')}</Text>
+        <Text style={[S.muted,{color:C.green,fontWeight:'700'}]}>{t('VIEW DETAILS  ›')}</Text></View>
+      <Text style={[S.amount,{color:C.ink,fontSize:23}]}>{available.length} item{available.length===1?'':'s'} available</Text>
+      <Note>{spent!=null?`${money(spent)} of groceries confirmed this month · `:''}scan a receipt to add what you bought</Note>
+    </Pressable>
 
-  function edit(item:PantryItem){
-    setEditing(item.id);setName(item.name);setQty(String(item.quantity));setUnit(item.unit);
-    setExpiry(item.expiry||'');setFormOpen(true);
-  }
-  function clear(){
-    setEditing(null);setName('');setQty('1');setUnit('piece');setExpiry('');setFormOpen(false);
-  }
-  async function save(){
-    const quantity=Number(qty);
-    if(!name.trim()||!unit.trim()||!Number.isFinite(quantity)||quantity<0||
-      (expiry&&!/^\d{4}-\d{2}-\d{2}$/.test(expiry)))
-      return Alert.alert('Check item','Enter a name, unit, non-negative quantity and optional YYYY-MM-DD expiry.');
-    try{
-      await addItem({id:editing||undefined,name:name.trim(),quantity,unit:unit.trim(),
-        expiry:expiry||undefined,available:quantity>0});
-      clear();
-    }catch(error){Alert.alert('Inventory save failed',String(error));}
-  }
-  async function toggle(item:PantryItem){
-    try{await addItem({...item,available:!item.available});}
-    catch(error){Alert.alert('Could not update item',String(error));}
-  }
-
-  return <Page title="Your smart pantry" subtitle="Know what is in your kitchen and use it well." showSettings>
-    <View style={[S.card,{backgroundColor:C.softGreen,borderColor:C.softGreen}]}>
-      <View style={S.between}>
-        <View><Text style={S.statLabel}>AVAILABLE INGREDIENTS</Text><Text style={[S.amount,{fontSize:27}]}>{available.length} items</Text></View>
-        <Text style={{fontSize:28}}>▤</Text>
-      </View>
-      <Note>Use what you already have before your next shop.</Note>
-    </View>
+    <Pressable accessibilityRole="button" onPress={()=>router.push('/cook-now')}
+      style={{padding:16,borderRadius:18,backgroundColor:C.softAmber,gap:8}}>
+      <View style={S.between}><Text style={S.title}>{t('📷  Cook with something now')}</Text>
+        <Text style={[S.muted,{color:C.green,fontWeight:'700'}]}>{t('VIEW DETAILS  ›')}</Text></View>
+      <Text style={[S.amount,{color:C.ink,fontSize:20}]}>{t('Scan an ingredient')}</Text>
+      <Note>{t('We tell you what it is, find recipes that use it, or create one with AI.')}</Note>
+    </Pressable>
 
     <Card>
-      <Label>Your ingredients</Label>
-      <View style={S.row}>
-        <View style={{flex:1}}><Btn title="Scan receipt" onPress={()=>router.push('/receipt')}/></View>
-        <View style={{flex:1}}><Btn title="+ Add item" outline onPress={()=>{setFormOpen(true);setEditing(null);}}/></View>
-      </View>
-      {state.pantry.length?state.pantry.map(item=><View key={item.id} style={{paddingVertical:10,borderBottomWidth:1,borderBottomColor:C.line,gap:7}}>
-        <View style={S.between}>
-          <View style={{flex:1,gap:2}}>
-            <Text style={S.title}>{capitalize(item.name)}</Text>
-            <Note>{item.quantity} {item.unit}{item.expiry?` · Expires ${item.expiry}`:''}</Note>
-          </View>
-          <Text style={[S.muted,{color:item.available&&item.quantity>0?C.green:C.muted,fontWeight:'700'}]}>
-            {item.available&&item.quantity>0?'AVAILABLE':'UNAVAILABLE'}
-          </Text>
-        </View>
-        <View style={S.row}>
-          <Pressable accessibilityRole="button" onPress={()=>edit(item)} style={{paddingVertical:6,paddingRight:12}}>
-            <Text style={{color:C.green,fontWeight:'700'}}>Edit</Text>
-          </Pressable>
-          <Pressable accessibilityRole="button" onPress={()=>void toggle(item)} style={{paddingVertical:6,paddingHorizontal:8}}>
-            <Text style={S.muted}>{item.available?'Mark unavailable':'Restore item'}</Text>
-          </Pressable>
-        </View>
-      </View>):<Note>Your pantry is empty. Add an item or confirm a grocery receipt.</Note>}
-    </Card>
-
-    {formOpen?<Card>
-      <Label>{editing?'Update ingredient':'Add an ingredient'}</Label>
-      <Field label="Ingredient name" value={name} onChangeText={setName}/>
-      <View style={S.row}>
-        <View style={{flex:1}}><Field label="Quantity" value={qty} onChangeText={setQty} keyboardType="decimal-pad"/></View>
-        <View style={{flex:1}}><Field label="Unit" value={unit} onChangeText={setUnit} placeholder="kg, piece, L"/></View>
-      </View>
-      <Field label="Expiry date (optional · YYYY-MM-DD)" value={expiry} onChangeText={setExpiry}/>
-      <Btn title={editing?'Save changes':'Add to pantry'} onPress={()=>void save()}/>
-      <Btn title="Cancel" outline onPress={clear}/>
-    </Card>:null}
-
-    <Card>
-      <View style={S.between}><Label>Find recipes from your pantry</Label><Text style={S.muted}>{filteredRecipes.length} recipes</Text></View>
-      <Field label="Search recipes" value={search} onChangeText={setSearch} placeholder="Search recipe names"/>
-      {list===null?<Loading/>:filteredRecipes.length?filteredRecipes.map(recipe=><Pressable key={recipe.id}
+      <View style={S.between}><Label>{t('Recipes you can cook now')}</Label><Text style={S.muted}>{ready.length} ready</Text></View>
+      {list===null?<Loading/>:(ready.length?ready:(list||[]).slice(0,4)).slice(0,6).map(recipe=><Pressable key={recipe.id}
         accessibilityRole="button" onPress={()=>router.push({pathname:'/recipe/[id]',params:{id:recipe.id}})}
-        style={{paddingVertical:12,borderBottomWidth:1,borderBottomColor:C.line}}>
-        <View style={S.between}>
-          <Text style={[S.title,{flex:1}]}>{recipe.name}</Text>
-          <Text style={{color:C.green,fontSize:19}}>›</Text>
-        </View>
-        <Note>{Math.round(recipe.coverage*100)}% available · {recipe.missing.length?`Missing ${recipe.missing.join(', ')}`:'Ready to cook'}</Note>
-      </Pressable>):<Note>No matching recipes. Try another search or add more pantry ingredients.</Note>}
-      {demo?<Note>Recipe samples are illustrative demo data, not a licensed recipe dataset.</Note>:null}
-    </Card>
-
-    <Card>
-      <ActionRow icon="◷" title="Household activity" subtitle="See pantry and grocery updates"
-        onPress={()=>router.push('/activity')}/>
+        style={{paddingVertical:11,borderTopWidth:1,borderTopColor:C.line}}>
+        <View style={S.between}><Text style={[S.title,{flex:1}]}>{recipe.name}</Text><Text style={{color:C.green,fontSize:19}}>›</Text></View>
+        <Note>{recipe.ai_generated?t('AI-generated · '):''}{Math.round(recipe.coverage*100)}% in your pantry{recipe.missing.length?` · missing ${recipe.missing.slice(0,3).join(', ')}`:' · ready to cook'}</Note>
+      </Pressable>)}
+      {list&&!list.length?<Note>{t('No recipes yet. Scan a receipt or an ingredient to get suggestions.')}</Note>:null}
+      <Pressable accessibilityRole="button" onPress={()=>router.push('/my-recipes')} style={{paddingTop:10,borderTopWidth:1,borderTopColor:C.line}}>
+        <Text style={{color:C.green,fontWeight:'800'}}>{t('📖 View my recipes and all recipes  ›')}</Text></Pressable>
     </Card>
   </Page>;
 }
-
-function capitalize(value:string){return value.charAt(0).toUpperCase()+value.slice(1);}
