@@ -3,7 +3,7 @@ import {t} from '../../src/i18n';
 import {ActivityIndicator,Pressable,Text,View} from 'react-native';
 import {router} from 'expo-router';
 import {useApp} from '../../src/context';
-import {Insight,SecurityStatus} from '../../src/types';
+import {Insight,PlanBill,SecurityStatus} from '../../src/types';
 import {money,S,C} from '../../src/theme';
 import {Btn,Note,Page} from '../../src/ui';
 
@@ -58,13 +58,18 @@ export default function Home(){
           <View style={S.heroMetric}>
             <Text style={S.heroMetricLabel}>{t('Water')}</Text>
             <Text style={S.heroMetricValue}>{summary?.water==null?t('No forecast yet'):money(summary.water)}</Text>
+            <PlanLine p={summary?.plan_effect?.water}/>
           </View>
           <View style={S.heroMetric}>
             <Text style={S.heroMetricLabel}>{t('Electricity')}</Text>
             <Text style={S.heroMetricValue}>{summary?.electricity==null?t('No forecast yet'):money(summary.electricity)}</Text>
+            <PlanLine p={summary?.plan_effect?.electricity}/>
           </View>
         </View>
         <Text style={S.heroFootnote}>{t('Estimates from your confirmed bills, calculated with the official CWA and CEB tariffs.')}</Text>
+        {summary?.plan_effect?<Pressable accessibilityRole="button" onPress={()=>router.navigate('/(tabs)/coach')}>
+          <Text style={[S.heroFootnote,{fontWeight:'800',color:C.white}]}>✦ {t('Includes')} {summary.plan_effect.plans} {t(summary.plan_effect.plans>1?'changes from your plan':'change from your plan')} · {t('see or remove in Coach')} ›</Text>
+        </Pressable>:null}
         <Btn title={t('View utility details  →')} outline onPress={()=>router.navigate('/(tabs)/utilities')}/>
       </>}
     </View>
@@ -94,4 +99,12 @@ export default function Home(){
       </View>
     </View>
   </Page>;
+}
+
+// "With your plan": the next bill after the changes applied in the Coach (recalculated with the official tariff).
+function PlanLine({p}:{p?:PlanBill}){
+  if(!p)return null;
+  const up=p.delta_rs>0;
+  return <Text style={{color:C.white,fontSize:12,fontWeight:'700',marginTop:3}}>
+    {t('With your plan')}: {money(p.after_rs)} ({up?'+':'−'}{money(Math.abs(p.delta_rs))})</Text>;
 }

@@ -1,22 +1,26 @@
-// AI Coach: "What if…?" questions about the bills and the budget (POST /household/coach).
-// The water and electricity engines calculate every number with the official tariffs; the AI only words it.
-// Layout: header, conversation (scrolls), suggestions, composer. The composer rises with the keyboard.
+// AI Coach: a conversation about changes at home and what they do to the bills (POST /household/coach).
+// "Hello" gets a hello back; "I want to shower more" gets "How many minutes more?" (quick-reply chips); then the water
+// and electricity engines calculate both bills with the official tariffs; "apply it" (or the button) adds the change to
+// the plan, and the predicted bills on Home include it. The server returns `context` (its follow-up question, the last
+// change) and the app sends it back with the next message: that is the conversation memory.
+// Layout: header, conversation (scrolls), quick replies, composer. The composer rises with the keyboard.
 import React,{useEffect,useRef,useState} from 'react';
 import {t} from '../../src/i18n';
 import {ActivityIndicator,Keyboard,KeyboardAvoidingView,Platform,Pressable,ScrollView,Text,TextInput,View} from 'react-native';
 import {router} from 'expo-router';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useApp} from '../../src/context';
-import {CoachReply,Plan,WhatIfChange} from '../../src/types';
+import {CoachReply,Plan,QuickReply,WhatIfChange} from '../../src/types';
 import {C,money,S} from '../../src/theme';
 import {BottomNavigation} from '../../src/ui';
 
-type Msg={role:'user'|'coach';text:string;reply?:CoachReply;question?:string};
+type Msg={role:'user'|'coach';text:string;reply?:CoachReply;question?:string;error?:boolean};
 const WIDTH={width:'100%' as const,maxWidth:440,alignSelf:'center' as const};
 
 export default function Coach(){
-  const {ask,demo,applyPlan,plans}=useApp();
-  const [msgs,setMsgs]=useState<Msg[]>([]);
+  const {ask,demo,applyPlan,plans,removePlan}=useApp();
+  const [msgs,setMsgs]=useState<Msg[]>([{role:'coach',text:t("Hi! 👋 I'm your LiveBetter coach. Tell me about a change at home, like showering longer, using the AC less or having guests, and I'll show you what it does to your water and electricity bills.")}]);
+  const [ctx,setCtx]=useState<Record<string,any>>({});      // conversation memory sent back to the server
   const [myPlan,setMyPlan]=useState<Plan[]>([]);
   const [showPlan,setShowPlan]=useState(false);
   const loadPlans=()=>{if(!demo)plans().then(setMyPlan).catch(()=>undefined);};
@@ -32,27 +36,37 @@ export default function Coach(){
   },[]);
   useEffect(()=>{setTimeout(()=>scroll.current?.scrollToEnd({animated:true}),80);},[msgs,sending]);
 
+  const oops=(e:unknown)=>`${t('Sorry, I could not answer that just now.')} ${e instanceof Error?e.message:String(e)}`;
+
   async function apply(i:number){
-    const m=msgs[i];if(!m?.question||sending)return;
+    const m=msgs[i];if(!m?.reply||sending)return;
     setSending(true);
-    try{const r=await applyPlan(m.question);
+    try{const r=await applyPlan(m.question||'',m.reply.plan);
       setMsgs(all=>all.map((x,j)=>j===i?{...x,reply:{...x.reply!,applied:r.applied,applied_message:r.applied_message}}:x));
-      loadPlans();}
-    catch(e){setMsgs(all=>[...all,{role:'coach',text:e instanceof Error?e.message:String(e)}]);}
+      setCtx({});loadPlans();}
+    catch(e){setMsgs(all=>[...all,{role:'coach',text:oops(e),error:true}]);}
     finally{setSending(false);}
   }
 
-  async function send(q=draft){
+  // shown = what appears in the user's bubble (a quick-reply label); text = what is sent to the coach.
+  async function send(q=draft,shown?:string){
     const text=q.trim();if(!text||sending)return;
-    setDraft('');setSending(true);setMsgs(m=>[...m,{role:'user',text}]);
+    setDraft('');setSending(true);setMsgs(m=>[...m,{role:'user',text:shown||text}]);
     try{
-      if(demo)throw Error('What-if answers are calculated by the backend. Run the app in live mode.');
-      const reply=await ask(text);
-      setMsgs(m=>[...m,{role:'coach',text:reply.answer,reply,question:text}]);
+      if(demo)throw Error(t('The coach needs the LiveBetter server. Run the app in live mode.'));
+      const reply=await ask(text,ctx);
+      setCtx(reply.context||{});
+      setMsgs(m=>[...m,{role:'coach',text:reply.answer,reply,question:reply.context?.last_question||text}]);
       if(reply.applied)loadPlans();
-    }catch(e){setMsgs(m=>[...m,{role:'coach',text:e instanceof Error?e.message:String(e)}]);}
+    }catch(e){setMsgs(m=>[...m,{role:'coach',text:oops(e),error:true}]);}
     finally{setSending(false);}
   }
+  async function remove(p:Plan){
+    try{setMyPlan(await removePlan(p.id));}
+    catch(e){setMsgs(m=>[...m,{role:'coach',text:oops(e),error:true}]);}
+  }
+  const last=msgs[msgs.length-1];
+  const quick:QuickReply[]=!sending&&last?.role==='coach'?(last.reply?.quick_replies||[]):[];
 
   return <SafeAreaView style={{flex:1,backgroundColor:C.bg}} edges={['top','bottom']}>
     <KeyboardAvoidingView style={{flex:1}} behavior="padding" keyboardVerticalOffset={0}>
@@ -74,31 +88,35 @@ export default function Coach(){
         {myPlan.length?<Pressable accessibilityRole="button" onPress={()=>setShowPlan(v=>!v)}
           style={{backgroundColor:C.softGreen,borderRadius:16,padding:13,gap:6}}>
           <View style={S.between}><Text style={S.title}>Your plan · {myPlan.length} change{myPlan.length>1?'s':''}</Text>
-            <Text style={{color:C.green,fontWeight:'800'}}>{money(Math.abs(myPlan.reduce((t,p)=>t+(p.total_delta_rs||0),0)))} {showPlan?'▴':'▾'}</Text></View>
-          {showPlan?myPlan.map(p=><View key={p.id} style={{borderTopWidth:1,borderTopColor:'#CDEBE2',paddingTop:6,gap:2}}>
-            <Text style={S.body}>{p.question}</Text>
-            <Text style={S.muted}>{p.changes.map(c=>`${c.title} (${c.delta_rs<0?'−':'+'}${money(Math.abs(c.delta_rs))})`).join(' · ')}</Text>
-          </View>):<Text style={S.muted}>{t('Changes you applied. Tap to see them.')}</Text>}
+            <Text style={{color:C.green,fontWeight:'800'}}>{(()=>{const v=myPlan.reduce((a,p)=>a+(p.total_delta_rs||0),0);return `${v<0?'−':'+'}${money(Math.abs(v))}`;})()} {showPlan?'▴':'▾'}</Text></View>
+          {showPlan?myPlan.map(p=><View key={p.id} style={{borderTopWidth:1,borderTopColor:'#CDEBE2',paddingTop:6,flexDirection:'row',gap:8,alignItems:'center'}}>
+            <View style={{flex:1,gap:2}}>
+              <Text style={S.body}>{p.changes.map(c=>c.title).join(' + ')}</Text>
+              <Text style={S.muted}>{p.changes.map(c=>`${t(c.module==='water'?'Water':'Electricity')} ${c.delta_rs<0?'−':'+'}${money(Math.abs(c.delta_rs))}`).join(' · ')}</Text>
+            </View>
+            <Pressable accessibilityRole="button" accessibilityLabel={t('Remove from my plan')} onPress={()=>void remove(p)}
+              style={{width:32,height:32,borderRadius:16,backgroundColor:'#FDECEC',alignItems:'center',justifyContent:'center'}}>
+              <Text style={{color:C.red,fontWeight:'900'}}>✕</Text></Pressable>
+          </View>):<Text style={S.muted}>{t('Included in your predicted bills on Home. Tap to see or remove.')}</Text>}
         </Pressable>:null}
-        {!msgs.length?<View style={{gap:12,paddingTop:6}}>
-          <View style={{backgroundColor:C.navy,borderRadius:20,padding:18,gap:8}}>
-            <Text style={S.heroEyebrow}>{t('AI COACH · WHAT-IF')}</Text>
-            <Text style={{color:C.white,fontSize:18,fontWeight:'800',lineHeight:24}}>{t('Ask about one change in your home. I recalculate your next water and electricity bills.')}</Text>
-            <Text style={S.heroFootnote}>{t('Official CWA and CEB tariffs, your own bills, compared with your budget. Say "apply it" to add a change to your plan straight away.')}</Text>
-          </View>
-        </View>:msgs.map((m,i)=>m.role==='user'?
+        {msgs.map((m,i)=>m.role==='user'?
           <View key={i} style={{alignSelf:'flex-end',maxWidth:'85%',backgroundColor:C.green,borderRadius:18,borderBottomRightRadius:5,
             paddingHorizontal:14,paddingVertical:10}}><Text style={{color:C.white,fontSize:14,lineHeight:20}}>{m.text}</Text></View>:
           <CoachAnswer key={i} msg={m} onApply={()=>void apply(i)} busy={sending}/>)}
         {sending?<View style={[S.row,{alignSelf:'flex-start',backgroundColor:C.white,borderRadius:16,padding:12}]}>
-          <ActivityIndicator color={C.green}/><Text style={S.muted}>{t('Recalculating your bills…')}</Text></View>:null}
+          <ActivityIndicator color={C.green}/><Text style={S.muted}>{t('Thinking…')}</Text></View>:null}
+        {quick.length?<View style={{flexDirection:'row',flexWrap:'wrap',gap:8}}>
+          {quick.map(q=><Pressable key={q.value} accessibilityRole="button" onPress={()=>void send(q.value,t(q.label))}
+            style={{borderWidth:1.5,borderColor:C.green,borderRadius:18,paddingHorizontal:14,paddingVertical:8,backgroundColor:C.white}}>
+            <Text style={{color:C.green,fontWeight:'800'}}>{t(q.label)}</Text></Pressable>)}
+        </View>:null}
       </ScrollView>
 
       <View style={{backgroundColor:C.white,borderTopWidth:1,borderTopColor:C.line}}>
         <View style={[WIDTH,{flexDirection:'row',alignItems:'flex-end',gap:8,paddingHorizontal:14,paddingVertical:10}]}>
-          <TextInput value={draft} onChangeText={setDraft} placeholder={t('What if I…')} placeholderTextColor={C.muted}
+          <TextInput value={draft} onChangeText={setDraft} placeholder={t('Type a message…')} placeholderTextColor={C.muted}
             multiline style={[S.chatInput,{maxHeight:110}]} onSubmitEditing={()=>void send()} blurOnSubmit returnKeyType="send"
-            accessibilityLabel="Ask a what-if question"/>
+            accessibilityLabel="Message the coach"/>
           <Pressable accessibilityRole="button" accessibilityLabel="Send" disabled={sending||!draft.trim()} onPress={()=>void send()}
             style={{width:44,height:44,borderRadius:14,backgroundColor:C.green,alignItems:'center',justifyContent:'center',
               opacity:sending||!draft.trim()?0.45:1}}><Text style={{color:C.white,fontWeight:'900',fontSize:18}}>↑</Text></Pressable>
@@ -112,9 +130,10 @@ export default function Coach(){
 function CoachAnswer({msg,onApply,busy}:{msg:Msg;onApply:()=>void;busy:boolean}){
   const r=msg.reply;
   const ok=(r?.changes||[]).filter(c=>c.status==='ok');
-  if(!r||r.intent!=='what_if'||!r.changes?.length)return <View style={{alignSelf:'flex-start',maxWidth:'92%',backgroundColor:C.white,
-    borderRadius:18,borderBottomLeftRadius:5,padding:14,borderWidth:1,borderColor:C.line}}>
-    <Text style={S.body}>{msg.text}</Text></View>;
+  if(!r||r.intent!=='what_if'||!r.changes?.length)return <View style={{alignSelf:'flex-start',maxWidth:'88%',
+    backgroundColor:msg.error?'#FDECEC':C.white,borderRadius:18,borderBottomLeftRadius:5,paddingHorizontal:14,paddingVertical:11,
+    borderWidth:1,borderColor:msg.error?'#F5C9C9':C.line}}>
+    <Text style={[S.body,{lineHeight:21},msg.error&&{color:C.red}]}>{r?.applied&&r.applied_message?`✓ ${r.applied_message}`:msg.text}</Text></View>;
   return <View style={{alignSelf:'stretch',backgroundColor:C.white,borderRadius:18,borderBottomLeftRadius:5,padding:14,gap:10,
     borderWidth:1,borderColor:C.line}}>
     {r.changes.map((c,i)=><ChangeCard key={i} c={c}/>)}
@@ -144,7 +163,11 @@ function CoachAnswer({msg,onApply,busy}:{msg:Msg;onApply:()=>void;busy:boolean})
   </View>;
 }
 
+const niceDate=(d?:string)=>{if(!d)return '';const x=new Date(`${d}T00:00:00`);
+  return isNaN(x.getTime())?d:x.toLocaleDateString(undefined,{day:'numeric',month:'short'});};
+
 function ChangeCard({c}:{c:WhatIfChange}){
+  const [how,setHow]=useState(false);
   if(c.status!=='ok')return <View style={{gap:3}}><Text style={S.title}>{c.title}</Text><Text style={S.muted}>{c.message}</Text></View>;
   return <View style={{gap:6}}>
     <View style={S.between}>
@@ -160,7 +183,9 @@ function ChangeCard({c}:{c:WhatIfChange}){
       <Text style={{color:C.muted,fontSize:18}}>→</Text>
       <View style={{flex:1}}><Text style={S.muted}>{t('With the change')}</Text><Text style={S.title}>{money(c.after_rs)}</Text></View>
     </View>
-    <Text style={S.muted}>{Math.abs(c.unit_change||0).toLocaleString()} {c.unit} {(c.unit_change||0)<0?t('less'):t('more')} · {c.period_start} → {c.period_end}{c.how?` · ${c.how}`:''}</Text>
+    <Text style={S.muted}>{Math.abs(c.unit_change||0).toLocaleString()} {c.unit} {(c.unit_change||0)<0?t('less'):t('more')} · {t('bill of')} {niceDate(c.period_start)} → {niceDate(c.period_end)}</Text>
+    {c.how?<Pressable accessibilityRole="button" onPress={()=>setHow(v=>!v)}>
+      <Text style={[S.muted,{color:C.green,fontWeight:'700'}]}>{how?`▴ ${c.how}`:t('▾ How is this calculated?')}</Text></Pressable>:null}
     {c.note?<Text style={[S.muted,{color:'#8A5A00'}]}>{c.note}</Text>:null}
   </View>;
 }

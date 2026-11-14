@@ -97,6 +97,7 @@ def test_coach_what_if_budget(client):
     client.post("/bills", json={"kind": "water", "period_start": "2026-08-13", "period_end": "2026-09-13", "units": 22})
     client.post("/bills", json={"kind": "water", "period_start": "2026-09-13", "period_end": "2026-10-13", "units": 24})
     client.post("/bills", json={"kind": "electricity", "period_start": "2026-09-01", "period_end": "2026-10-01", "units": 210})
+    client.put("/habits/electricity", json={"E3": "solar"})               # solar water: showers do not change the CEB bill
     r = client.post("/household/coach", json={"message": "if i shower 2min less per day, will it affect my budjet?"}).json()
     c = r["changes"][0]
     assert r["intent"] == "what_if" and c["status"] == "ok" and c["delta_rs"] < 0 and c["after_rs"] < c["before_rs"]
@@ -121,17 +122,15 @@ def test_coach_cross_module_suggest_and_apply(client):
     client.post("/bills", json={"kind": "water", "period_start": "2026-08-13", "period_end": "2026-09-13", "units": 22})
     client.post("/bills", json={"kind": "water", "period_start": "2026-09-13", "period_end": "2026-10-13", "units": 24})
     client.post("/bills", json={"kind": "electricity", "period_start": "2026-09-01", "period_end": "2026-10-01", "units": 260})
-    r = client.post("/household/coach", json={"message": "What if we shower 3 minutes less every day?"}).json()
-    assert [c["module"] for c in r["changes"]] == ["water", "electricity"]
-    assert r["changes"][1]["status"] == "needs_bill"                       # water heating not answered yet
-    client.put("/habits/electricity", json={"E3": "electric"})
-    r = client.post("/household/coach", json={"message": "What if we shower 3 minutes less every day?"}).json()
+    q = client.post("/household/coach", json={"message": "What if we shower 3 minutes less every day?"}).json()
+    assert q["intent"] == "clarify" and q["context"]["pending"]["need"] == "heater"   # water heating not answered yet
+    r = client.post("/household/coach", json={"message": "electric", "context": q["context"]}).json()
     assert [c["status"] for c in r["changes"]] == ["ok", "ok"] and r["changes"][1]["delta_rs"] < 0
     assert r["suggestion"].startswith("My suggestion") and r["can_apply"] and not r["apply_requested"]
     g = client.post("/household/coach", json={"message": "What if 2 guests stay for 5 days?"}).json()
     assert {c["module"] for c in g["changes"]} == {"water", "electricity"}
     a = client.post("/household/coach", json={"message": "Switch off standby, apply it now"}).json()
-    assert a["applied"] and "Applied" in a["applied_message"]
+    assert a["applied"] and "added it to your plan" in a["applied_message"]
     b = client.post("/household/coach/apply", json={"question": "What if we use the AC 1 hour less a day?"}).json()
     assert b["applied"]
     plans = client.get("/household/plans").json()
@@ -155,3 +154,39 @@ def test_ai_recipe_save_then_cook_lowers_stock(client):
     assert client.post(f"/recipes/{rid}/cook", json={"operation_id": str(uuid.uuid4())}).status_code == 200
     rice = [p for p in client.get("/pantry").json()["items"] if p["ingredient_name"] == "rice"][0]
     assert float(rice["quantity"]) == 1.5
+
+
+def test_coach_conversation_follow_up_apply_and_forecast(client):
+    """Hello -> hello back; "shower more" -> how many minutes? -> 10 -> water + electricity; "apply it" -> the plan
+    changes the predicted bills; removing it puts them back."""
+    client.post("/households/onboarding", json={"name": "Home", "members": 3, "home_type": "House",
+                                               "monthly_target": 9000}, headers=_step_up(client))
+    client.post("/bills", json={"kind": "water", "period_start": "2026-08-13", "period_end": "2026-09-13", "units": 22})
+    client.post("/bills", json={"kind": "water", "period_start": "2026-09-13", "period_end": "2026-10-13", "units": 24})
+    client.post("/bills", json={"kind": "electricity", "period_start": "2026-09-01", "period_end": "2026-10-01", "units": 260})
+    hi = client.post("/household/coach", json={"message": "Hello"}).json()
+    assert hi["intent"] == "chat" and hi["answer"].startswith("Hello") and not hi["changes"]
+    q = client.post("/household/coach", json={"message": "I want to shower more everyday"}).json()
+    assert q["intent"] == "clarify" and "How many minutes more" in q["answer"] and q["quick_replies"]
+    bad = client.post("/household/coach", json={"message": "hmm", "context": q["context"]}).json()
+    assert bad["intent"] == "clarify" and "did not catch" in bad["answer"]
+    h = client.post("/household/coach", json={"message": "10", "context": bad["context"]}).json()
+    assert h["context"]["pending"]["need"] == "heater"
+    r = client.post("/household/coach", json={"message": "electric", "context": h["context"]}).json()
+    assert r["intent"] == "what_if" and [c["module"] for c in r["changes"]] == ["water", "electricity"]
+    assert all(c["delta_rs"] > 0 for c in r["changes"]) and r["changes"][0]["title"] == "Shower 10 min more"
+    assert r["context"]["can_apply"]
+    before = client.get("/household/insights?explain=false").json()
+    assert before["plan_effect"] is None
+    a = client.post("/household/coach", json={"message": "Apply it to my plan", "context": r["context"]}).json()
+    assert a["applied"] and "Shower 10 min more" in a["answer"]
+    eff = client.get("/household/insights?explain=false").json()["plan_effect"]
+    assert eff["water"]["after_rs"] > eff["water"]["before_rs"] and eff["electricity"]["delta_rs"] > 0
+    plans = client.get("/household/plans").json()
+    assert len(plans) == 1
+    assert client.delete(f"/household/plans/{plans[0]['id']}").json() == []
+    assert client.get("/household/insights?explain=false").json()["plan_effect"] is None
+    nothing = client.post("/household/coach", json={"message": "apply it"}).json()
+    assert not nothing.get("applied") and "Which change" in nothing["answer"]
+    thanks = client.post("/household/coach", json={"message": "thanks!"}).json()
+    assert "welcome" in thanks["answer"]

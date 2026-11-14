@@ -44,8 +44,21 @@ def _days_in(t, cycle_days):
     return cycle_days, "every day of the next bill period"
 
 
+MORE_RE = r"\b(more|extra|longer|increase|add|additional|plus|plis|davantage)\b"
+LESS_RE = r"\b(less|shorter|fewer|reduce|cut|lower|save|stop|instead|moins|mwins|diminye|redwir)\b"
+
+
 def _sign(t):
-    return 1 if re.search(r"\b(more|extra|longer|increase|add|additional)\b", t) else -1
+    return 1 if re.search(MORE_RE, t) else -1
+
+
+def _direction(t):
+    """1 = more, -1 = less, None = the person did not say (the coach asks)."""
+    if re.search(MORE_RE, t):
+        return 1
+    if re.search(LESS_RE, t):
+        return -1
+    return None
 
 
 def parse(question, members):
@@ -57,15 +70,21 @@ def parse(question, members):
         sign = _sign(c)
         people = members if re.search(r"\b(we|everyone|each|all of us|whole family|household|every person)\b", c) else 1
         if re.search(r"guest|visitor|people (stay|coming|visit)|someone (stay|away)|away", c):
-            n = _num(r"(\d+) ?(?:guests?|visitors?|people|persons?)", c, 1)
-            out.append({"module": "water", "kind": "guests", "people": n * (-1 if "away" in c else 1),
-                        "days": _num(r"(\d+) ?days?", c, 7)})
-        elif "shower" in c or "bath" in c:
-            mins = _num(r"(\d+(?:\.\d+)?) ?(?:min|minute)", c, 2)
-            out.append({"module": "water", "kind": "shower", "minutes": mins, "people": people, "sign": sign})
+            n = _num(r"(\d+) ?(?:guests?|visitors?|people|persons?)", c)
+            d = _num(r"(\d+) ?days?", c)
+            if d is None and _num(r"(\d+) ?weeks?", c):
+                d = _num(r"(\d+) ?weeks?", c) * 7
+            out.append({"module": "water", "kind": "guests", "people": (n or 1) * (-1 if "away" in c else 1),
+                        "days": d or 7, "asked": {"people": n is not None, "days": d is not None}})
+        elif "shower" in c or "bath" in c or "douche" in c or "bengn" in c:
+            mins = _num(r"(\d+(?:\.\d+)?) ?(?:min|minute)", c)
+            if mins is None and _num(r"(\d+(?:\.\d+)?) ?(?:h|hours?)\b", c):
+                mins = _num(r"(\d+(?:\.\d+)?) ?(?:h|hours?)\b", c) * 60
+            out.append({"module": "water", "kind": "shower", "minutes": mins if mins is not None else 2, "people": people,
+                        "sign": sign, "asked": {"minutes": mins is not None, "sign": _direction(c) is not None}})
         elif re.search(r"laundry|washing|wash(es)? (?:of )?clothes|loads?\b", c) and not re.search(r"car|dish", c):
             out.append({"module": "water", "kind": "laundry", "loads_per_week": _num(r"(\d+(?:\.\d+)?) ?(?:loads?|wash)", c, 1),
-                        "sign": sign, "also_electricity": True})
+                        "sign": sign, "also_electricity": True, "asked": {"sign": _direction(c) is not None}})
         elif re.search(r"tap|leak|drip", c):
             out.append({"module": "water", "kind": "tap", "taps": _num(r"(\d+) ?(?:taps?|leaks?)", c, 1)})
         elif re.search(r"flush|toilet", c):
@@ -78,8 +97,9 @@ def parse(question, members):
             hours = _num(r"(\d+(?:\.\d+)?) ?(?:h|hr|hrs|hours?)\b", c)
             if hours is None:
                 mins = _num(r"(\d+(?:\.\d+)?) ?(?:min|minute)", c)
-                hours = mins / 60 if mins else 1
-            out.append({"module": "electricity", "kind": "appliance", "appliance": appliance, "hours": hours, "sign": sign})
+                hours = mins / 60 if mins else None
+            out.append({"module": "electricity", "kind": "appliance", "appliance": appliance, "hours": hours or 1, "sign": sign,
+                        "asked": {"hours": hours is not None, "sign": _direction(c) is not None}})
         elif "%" in c or "percent" in c:
             pct = _num(r"(\d+(?:\.\d+)?) ?(?:%|percent)", c)
             module = "electricity" if re.search(r"electric|power|kwh|ceb|energy", c) else "water"
@@ -317,9 +337,9 @@ def _budget(household, changes):
     return {"lines": lines, "monthly_target_rs": target, "total_delta_rs": total_delta}
 
 
-def answer(household, question):
+def answer(household, question, changes=None):
     members = household.get("members") or 1
-    changes_in = parse(question, members) or ai_parse(question, members)
+    changes_in = changes if changes is not None else (parse(question, members) or ai_parse(question, members))
     if not changes_in:
         return {"answer": "I answer what-if questions about your water and electricity bills and your budget. Ask, for "
                           "example: \"What if I shower 2 minutes less every day?\" or \"What if we use the AC 1 hour "
@@ -359,11 +379,12 @@ def answer(household, question):
         parts.append("This is an estimate with the official tariffs; your next bill shows the real change.")
     return {"answer": " ".join(parts), "intent": "what_if", "source": "template", "changes": results, "budget": budget,
             "suggestion": suggestion, "can_apply": bool(ok), "apply_requested": wants_apply(question),
-            "plan": [{k: c.get(k) for k in ("kind", "minutes", "people", "loads_per_week", "taps", "flushes", "days",
-                                            "appliance", "hours", "pct", "module", "sign", "text")} for c in changes_in],
+            "plan": [{k: c.get(k) for k in PLAN_KEYS if c.get(k) is not None} for c in changes_in],
             "suggestions": SUGGESTIONS, "actions": []}
 
 
+PLAN_KEYS = ("kind", "minutes", "people", "loads_per_week", "taps", "flushes", "days", "appliance", "hours", "pct", "module",
+             "sign", "text", "one_day", "also_electricity")
 APPLY_RE = re.compile(r"\b(apply|do it|go ahead|set it|start (it|now|this)|commit|make it a goal|add (it )?to my (plan|goals))\b")
 
 
@@ -394,13 +415,18 @@ def _suggest(ok, budget):
     return "My suggestion: this does not change your bills, so do it only if it helps in other ways."
 
 
-def apply_plan(ctx, household, question):
+def apply_plan(ctx, household, question, changes=None):
     """Apply = record the change as the household's plan (household_actions + activity), and also save it as a goal in
-    the water / electricity module when that module supports it (so completing it later lowers the forecast)."""
-    result = answer(household, question)
+    the water / electricity module when that module supports it (so completing it later lowers the forecast).
+    The next-bill forecast shown on Home and Utilities then includes the plan (plan_effect)."""
+    result = answer(household, question, changes=changes)
     ok = [c for c in result["changes"] if c["status"] == "ok"]
     if not ok:
-        return {**result, "applied": False, "applied_message": "Nothing to apply: add bills first."}
+        if result.get("intent") == "help":
+            return {**result, "applied": False, "intent": "chat",
+                    "answer": "Which change should I add to your plan? Tell me first, for example: \"I want to shower 2 minutes "
+                              "less\".", "applied_message": None}
+        return {**result, "applied": False, "applied_message": "Nothing to apply yet: add your water and electricity bills first."}
     saved_goals = []
     for c in result["plan"]:
         try:
@@ -430,21 +456,306 @@ def apply_plan(ctx, household, question):
     total = round(sum(c["delta_rs"] for c in ok), 2)
     ctx.db.table("household_actions").insert({"household_id": household["id"], "action_type": "coach:plan",
                                               "assumptions": {"question": question[:300], "total_delta_rs": total,
+                                                              "plan": result["plan"],
                                                               "changes": [{k: c.get(k) for k in ("module", "title", "delta_rs", "when")}
                                                                           for c in ok]},
                                               "status": "selected"}).execute()
     ctx.db.table("activity_logs").insert({"household_id": household["id"], "event_type": "ai.plan_applied",
                                           "details": {"module": "ai", "question": question[:200], "total_delta_rs": total,
                                                       "goals": saved_goals}}).execute()
-    msg = (f"Applied. Added to your plan: {', '.join(c['title'] for c in ok)} (about Rs {abs(total):,.2f} "
-           f"{'less' if total <= 0 else 'more'} on your next bills).")
+    msg = (f"Done! I added it to your plan: {', '.join(c['title'] for c in ok)} (about Rs {abs(total):,.2f} "
+           f"{'less' if total <= 0 else 'more'} on your next bills). Your predicted bills on Home and Utilities now include it.")
     if saved_goals:
         msg += " Also saved as goals in " + ", ".join(saved_goals) + "."
-    return {**result, "applied": True, "applied_message": msg, "goals": saved_goals}
+    return {**result, "applied": True, "applied_message": msg, "goals": saved_goals, "can_apply": False}
 
 
 def list_plans(ctx, household):
     rows = (ctx.db.table("household_actions").select("*").eq("household_id", household["id"])
             .eq("action_type", "coach:plan").execute().data or [])
+    rows = [r for r in rows if r.get("status") == "selected"]
     return [{"id": r["id"], "status": r.get("status"), "created_at": r.get("created_at"),
              **(r.get("assumptions") or {})} for r in rows]
+
+
+# ---------------- plans -> predicted bills ----------------
+def remove_plan(ctx, household, plan_id):
+    ctx.db.table("household_actions").update({"status": "removed"}).eq("id", plan_id).eq("household_id", household["id"]).execute()
+    ctx.db.table("activity_logs").insert({"household_id": household["id"], "event_type": "ai.plan_removed",
+                                          "details": {"module": "ai", "plan_id": plan_id}}).execute()
+    return list_plans(ctx, household)
+
+
+def plan_effect(ctx, household):
+    """Next-bill forecast WITH the changes the household applied from the coach. All plans are added together first
+    (litres and kWh), then each bill is recalculated once with the official tariff, so tariff blocks are right."""
+    try:
+        plans = list_plans(ctx, household)
+    except Exception as exc:
+        log.info("Plans not read: %s", exc)
+        return None
+    if not plans:
+        return None
+    members = household.get("members") or 1
+    litres = kwh = 0.0
+    for p in plans:
+        changes = clean_plan(p.get("plan")) or parse(p.get("question") or "", members)
+        for c in changes:
+            try:
+                for r in calculate(c, members):
+                    if r.get("status") == "ok":
+                        if r["unit"] == "L":
+                            litres += r["unit_change"]
+                        else:
+                            kwh += r["unit_change"]
+            except Exception as exc:
+                log.info("Plan change skipped: %s", exc)
+    out = {"plans": len(plans)}
+    for module, amount, fn in (("water", litres, _water_effect), ("electricity", kwh, _elec_effect)):
+        if amount:
+            r = fn(amount, "Your plan", "", "")
+            if r.get("status") == "ok":
+                out[module] = {"before_rs": r["before_rs"], "after_rs": r["after_rs"], "delta_rs": r["delta_rs"],
+                               "unit_change": r["unit_change"], "unit": r["unit"]}
+    return out
+
+
+# ---------------- conversation (14 Nov): greetings, follow-up questions, "apply it" ----------------
+KINDS = {"shower", "laundry", "tap", "flush", "guests", "appliance", "standby", "percent"}
+LIMITS = {"minutes": (0, 240), "people": (-20, 50), "loads_per_week": (0, 50), "taps": (0, 20), "flushes": (0, 50),
+          "days": (0, 366), "hours": (0, 24), "pct": (0, 100)}
+APPLIANCES = {a for a, _ in APPLIANCE_WORDS}
+
+
+def clean_plan(plan):
+    """Changes sent back by the app (conversation memory). Only known kinds and bounded numbers are kept, and every
+    rupee amount is recalculated on the server, so the app cannot change a result."""
+    out = []
+    for c in (plan or [])[:4] if isinstance(plan, list) else []:
+        if not isinstance(c, dict) or c.get("kind") not in KINDS:
+            continue
+        x = {"kind": c["kind"], "module": "electricity" if c["kind"] in ("appliance", "standby") else
+             ("electricity" if c.get("module") == "electricity" else "water"),
+             "sign": 1 if c.get("sign") == 1 else -1, "text": str(c.get("text") or "")[:200]}
+        for k, (lo, hi) in LIMITS.items():
+            if c.get(k) is not None:
+                try:
+                    x[k] = min(max(float(c[k]), lo), hi)
+                except (TypeError, ValueError):
+                    pass
+        if c["kind"] == "appliance":
+            x["appliance"] = c.get("appliance") if c.get("appliance") in APPLIANCES else "air_conditioner"
+            x.setdefault("hours", 1)
+        if c["kind"] == "shower":
+            x.setdefault("minutes", 2)
+            x.setdefault("people", 1)
+        if c["kind"] == "laundry":
+            x.setdefault("loads_per_week", 1)
+            x["also_electricity"] = True
+        if c["kind"] == "guests":
+            x.setdefault("people", 1)
+            x.setdefault("days", 7)
+        if c["kind"] == "percent":
+            x.setdefault("pct", 10)
+        if c.get("one_day"):
+            x["one_day"] = True
+        out.append(x)
+    return out
+
+
+GREET_RE = re.compile(r"^\W*(hi|hello|hey|hiya|yo|good (morning|afternoon|evening)|bonjour|bonsoir|salut|allo|alo|bonzour|bonswar)\b")
+THANKS_RE = re.compile(r"\b(thanks|thank you|thx|merci|mersi|cheers)\b")
+BYE_RE = re.compile(r"\b(bye|goodbye|see you|au revoir|orevwar|ciao)\b")
+HOW_RE = re.compile(r"how are you|how r u|how's it going|ki manier|ki maniere|comment (ca|ça) va|ça va")
+WHO_RE = re.compile(r"who are you|what can you do|what do you do|how does (this|it) work|^\W*help\W*$")
+YES_RE = re.compile(r"^\W*(yes|yeah|yep|yup|sure|ok|okay|please do|oui|wi|go on|of course|absolutely)\b")
+NO_RE = re.compile(r"^\W*(no|nope|not now|non|later|pa bizin|don't|do not)\b")
+
+NAMES = {"air_conditioner": "the air conditioner", "water_heater": "the water heater", "washing_machine": "the washing machine",
+         "iron": "the iron", "television": "the TV", "desktop_computer": "the computer", "kettle": "the kettle", "fan": "the fan"}
+
+
+def _chat(text, quick=None, context=None, intent="chat"):
+    return {"answer": text, "intent": intent, "source": "template", "changes": [], "budget": None, "actions": [],
+            "quick_replies": quick or [], "context": context or {}}
+
+
+def _qr(*pairs):
+    return [{"label": label, "value": value} for label, value in pairs]
+
+
+def _next_question(changes):
+    """The first thing still missing, as a friendly question. None when everything needed is known."""
+    for i, c in enumerate(changes):
+        asked = c.get("asked") or {}
+        k = c["kind"]
+        if k in ("shower", "appliance", "laundry") and asked.get("sign") is False:
+            what = {"shower": "showering", "laundry": "laundry"}.get(k, f"using {NAMES.get(c.get('appliance'), 'it')}")
+            return i, "sign", f"Got it. Do you mean more {what} than now, or less?", _qr(("More", "more"), ("Less", "less"))
+        if k == "shower" and asked.get("minutes") is False:
+            word = "more" if c.get("sign") == 1 else "less"
+            return i, "minutes", f"Sure! How many minutes {word} per shower?", _qr(("2 min", "2 minutes"), ("5 min", "5 minutes"),
+                                                                                  ("10 min", "10 minutes"))
+        if k == "appliance" and asked.get("hours") is False:
+            word = "more" if c.get("sign") == 1 else "less"
+            return i, "hours", f"OK. How long {word} per day for {NAMES.get(c.get('appliance'), 'it')}?", \
+                _qr(("30 min", "30 minutes"), ("1 hour", "1 hour"), ("2 hours", "2 hours"))
+        if k == "guests" and (asked.get("people") is False or asked.get("days") is False):
+            who = "people will be away" if (c.get("people") or 0) < 0 else "guests"
+            return i, "guests", f"Nice! How many {who}, and for how many days?", _qr(("1 for 3 days", "1 person for 3 days"),
+                                                                                   ("2 for 5 days", "2 people for 5 days"),
+                                                                                   ("2 for a week", "2 people for 7 days"))
+    for i, c in enumerate(changes):
+        if c["kind"] == "shower" and not (c.get("asked") or {}).get("heater_done"):
+            try:
+                if _electric_water_heating() is None:
+                    return i, "heater", ("One more thing, so I can include electricity too: how is your shower water heated?"),\
+                        _qr(("Electric heater", "electric"), ("Solar", "solar"), ("Gas", "gas"), ("No hot water", "none"))
+            except Exception:
+                pass
+    return None
+
+
+def _fill(change, need, message):
+    """Apply the person's reply to the change. Returns True if the reply answered the question."""
+    t = message.lower()
+    nums = [float(x) for x in re.findall(r"\d+(?:[.,]\d+)?", t.replace(",", "."))]
+    asked = change.setdefault("asked", {})
+    if need == "sign":
+        d = _direction(t)
+        if d is None:
+            return False
+        change["sign"], asked["sign"] = d, True
+        return True
+    if need == "minutes":
+        if not nums and not re.search(r"half an hour|an hour", t):
+            return False
+        v = nums[0] if nums else (30 if "half" in t else 60)
+        if re.search(r"\b(h|hr|hrs|hours?)\b", t) and nums:
+            v *= 60
+        change["minutes"], asked["minutes"] = v, True
+        if _direction(t) is not None:
+            change["sign"] = _direction(t)
+        return True
+    if need == "hours":
+        if not nums and not re.search(r"half an hour|an hour", t):
+            return False
+        v = nums[0] if nums else (0.5 if "half" in t else 1)
+        if re.search(r"\b(min|mins|minutes?)\b", t) and nums:
+            v /= 60
+        change["hours"], asked["hours"] = v, True
+        return True
+    if need == "guests":
+        if not nums:
+            return False
+        people = _num(r"(\d+) ?(?:guests?|people|persons?|visitors?)", t) or nums[0]
+        days = _num(r"(\d+) ?days?", t) or ((_num(r"(\d+) ?weeks?", t) or 0) * 7) or (7 if "week" in t else None) \
+            or (nums[1] if len(nums) > 1 else None)
+        sign = -1 if (change.get("people") or 0) < 0 else 1
+        change["people"], asked["people"] = sign * people, True
+        change["days"], asked["days"] = days or change.get("days") or 7, True     # no number of days: one week
+        return True
+    if need == "heater":
+        value = ("electric" if re.search(r"electric|yes|wi|oui|geyser|heater", t) else "solar" if "sol" in t
+                 else "gas" if re.search(r"gas|gaz", t) else "none" if re.search(r"none|no|pa|cold|froid", t) else None)
+        if value is None:
+            return False
+        try:                                    # remembered as the answer to electricity habit question E3
+            from electricity import api as eapi
+            eapi.update_assessment({"E3": value})
+        except Exception as exc:
+            log.info("Heater answer not saved: %s", exc)
+        asked["heater_done"] = True
+        return True
+    return False
+
+
+def _ask_or_answer(ctx, household, changes, question, apply=False):
+    q = _next_question(changes)
+    if q:
+        i, need, text, quick = q
+        return _chat(text, quick, {"pending": {"changes": changes, "index": i, "need": need, "apply": apply,
+                                                "question": question}}, intent="clarify")
+    plan = [{k: c.get(k) for k in PLAN_KEYS if c.get(k) is not None} for c in changes]
+    result = apply_plan(ctx, household, question, changes=plan) if apply else answer(household, question, changes=plan)
+    if apply and result.get("applied"):
+        result["answer"] = result["applied_message"]
+    result["quick_replies"] = []          # the answer card has its own "Apply to my plan" button
+    result["context"] = {"last_plan": result.get("plan") or plan, "last_question": question,
+                         "can_apply": bool(result.get("can_apply")) and not result.get("applied")}
+    return result
+
+
+def _restore(pending):
+    """Pending changes come back from the app: keep the 'asked' flags, clean every number."""
+    raw = pending.get("changes") if isinstance(pending.get("changes"), list) else []
+    clean = clean_plan(raw)
+    for c, r in zip(clean, raw):
+        if isinstance(r, dict) and isinstance(r.get("asked"), dict):
+            c["asked"] = {k: bool(v) for k, v in r["asked"].items() if k in ("minutes", "sign", "hours", "people", "days",
+                                                                             "heater_done")}
+    return clean
+
+
+def converse(ctx, household, message, context=None):
+    """One turn of the coach conversation. `context` is what the previous reply returned (the app sends it back)."""
+    context = context if isinstance(context, dict) else {}
+    members = household.get("members") or 1
+    t = message.lower().strip().replace("’", "'")
+    pending = context.get("pending") if isinstance(context.get("pending"), dict) else None
+
+    # 1. The person is answering my follow-up question.
+    if pending:
+        changes = _restore(pending)
+        i = int(pending.get("index") or 0)
+        if changes and 0 <= i < len(changes) and _fill(changes[i], pending.get("need"), message):
+            return _ask_or_answer(ctx, household, changes, str(pending.get("question") or message)[:300],
+                                  apply=bool(pending.get("apply")) or wants_apply(t))
+        if NO_RE.match(t) or re.search(r"\b(cancel|never mind|forget it)\b", t):
+            return _chat("No problem, I left it there. Ask me about another change whenever you like.")
+        if not parse(message, members) and not wants_apply(t):
+            q = _next_question(changes) if changes else None
+            if q:
+                return _chat("Sorry, I did not catch that. " + q[2], q[3], {"pending": pending}, intent="clarify")
+
+    # 2. "Apply it" / "yes" after an answer: apply what we just discussed.
+    if wants_apply(t) or (YES_RE.match(t) and context.get("can_apply")):
+        own = parse(message, members)
+        if own:
+            return _ask_or_answer(ctx, household, own, message, apply=True)
+        last = clean_plan(context.get("last_plan"))
+        if last:
+            return _ask_or_answer(ctx, household, last, str(context.get("last_question") or message)[:300], apply=True)
+        return _chat("Happy to! Which change should I add to your plan? Tell me first, for example: \"I want to shower "
+                     "2 minutes less\".")
+    if NO_RE.match(t) and context.get("can_apply"):
+        return _chat("No problem, I did not change your plan. Want to try another change?")
+
+    # 3. A what-if question.
+    changes = parse(message, members)
+    if changes:
+        return _ask_or_answer(ctx, household, changes, message)
+
+    # 4. Small talk.
+    name = (household.get("name") or "").strip()
+    if GREET_RE.match(t):
+        return _chat(f"Hello{' ' + name if name and name.lower() != 'my household' else ''}! 👋 I'm your LiveBetter coach. "
+                     "Tell me about a change at home, like showering longer, using the AC less or having guests over, "
+                     "and I'll show you what it does to your next water and electricity bills.")
+    if HOW_RE.search(t):
+        return _chat("I'm good, thanks for asking! 😊 What change would you like to try on your bills today?")
+    if THANKS_RE.search(t):
+        return _chat("You're welcome! Anything else you'd like to try?")
+    if BYE_RE.search(t):
+        return _chat("Bye! Your plan is saved. Come back any time to try another change. 👋")
+    if WHO_RE.search(t):
+        return _chat("I'm your LiveBetter coach. Tell me about one change, for example \"I want to shower 5 minutes less\" "
+                     "or \"2 guests are coming for 3 days\". I calculate the effect on your next water and electricity "
+                     "bills with the official CWA and CEB tariffs, and you can add it to your plan.")
+
+    # 5. Anything else: Gemini only classifies it into the same changes (never calculates).
+    changes = ai_parse(message, members)
+    if changes:
+        return _ask_or_answer(ctx, household, changes, message)
+    return _chat("Hmm, I'm not sure what change you mean. 🤔 I can work out what happens to your bills if you change "
+                 "something at home, like your showers, laundry, the AC, standby or guests. What would you like to try?")

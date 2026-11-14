@@ -33,7 +33,7 @@ def require_login(authorization: str = Header(default="")):
     except ImportError:
         pass
     if not hmac.compare_digest(authorization, f"Bearer {TOKEN}"):
-        err(401, "unauthorised", "Sign in first: POST /auth/login with the household email and password.")
+        err(401, "unauthorised", "Please log in to continue.")
 
 
 class Login(BaseModel):

@@ -54,6 +54,58 @@ def security_error(_: Request, exc: SecurityError):
                                                                     "details": exc.details}})
 
 
+# Friendly form errors (14 Nov): "Check the billing start date: use a date like 2026-09-13" instead of Pydantic's
+# technical list. The original details stay in "details" for developers.
+FIELD_NAMES = {"period_start": "billing start date", "period_end": "billing end date", "start": "billing start date",
+               "end": "billing end date", "units": "amount used on the bill", "m3": "water used (m³)",
+               "kwh": "electricity used (kWh)", "amount": "bill amount", "amount_rs": "bill amount", "email": "email",
+               "password": "password", "message": "message", "question": "question", "members": "number of people",
+               "date": "date", "index_m3": "meter number", "index_kwh": "meter number", "quantity": "quantity",
+               "name": "name", "pattern": "pattern", "code": "code"}
+
+
+def _friendly(e):
+    field = next((str(x) for x in reversed(e.get("loc", [])) if isinstance(x, str) and x != "body"), "")
+    label = FIELD_NAMES.get(field, field.replace("_", " ") or "form")
+    t, ctx = e.get("type", ""), e.get("ctx") or {}
+    if t == "missing":
+        return f"Please fill in the {label}."
+    if "date" in t:
+        return f"Check the {label}: use a date like 2026-09-13."
+    if t in ("greater_than", "greater_than_equal"):
+        return f"The {label} must be more than {float(ctx.get('gt', ctx.get('ge', 0))):g}."
+    if t in ("less_than", "less_than_equal"):
+        return f"The {label} is too big."
+    if t in ("float_parsing", "int_parsing", "float_type", "int_type"):
+        return f"The {label} must be a number."
+    if t == "string_too_short":
+        return f"The {label} is too short."
+    if t == "string_too_long":
+        return f"The {label} is too long."
+    msg = str(e.get("msg", "")).replace("Value error, ", "")
+    return f"Check the {label}: {msg}" if label != "form" else msg or "Please check the form."
+
+
+from fastapi.exceptions import RequestValidationError  # noqa: E402
+
+
+@app.exception_handler(RequestValidationError)
+def validation_error(_: Request, exc: RequestValidationError):
+    errors = exc.errors()
+    return JSONResponse(status_code=422, content={"detail": {"code": "validation_error",
+                                                             "message": " ".join(dict.fromkeys(_friendly(e) for e in errors[:3])),
+                                                             "details": {"errors": [{"loc": list(e.get("loc", [])), "msg": e.get("msg")}
+                                                                                    for e in errors]}}})
+
+
+@app.exception_handler(Exception)
+def unexpected_error(_: Request, exc: Exception):
+    import logging
+    logging.getLogger("livebetter").exception("Unexpected error: %s", exc)
+    return JSONResponse(status_code=500, content={"detail": {"code": "server_error", "details": {},
+                        "message": "Something went wrong on our side. Your data is safe: please try again in a moment."}})
+
+
 app.include_router(auth_router)
 app.include_router(app_router)
 app.include_router(security_router)

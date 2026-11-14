@@ -17,3 +17,13 @@ def db_error(exc: APIError) -> HTTPException:
     else:
         status, code = 400, "database_error"
     return HTTPException(status_code=status, detail={"code": code, "message": message})
+
+
+def nice_date(d) -> str:
+    """2026-08-01 -> '1 Aug 2026' (for messages people read)."""
+    from datetime import date
+    try:
+        d = d if isinstance(d, date) else date.fromisoformat(str(d))
+        return f"{d.day} {d.strftime('%b %Y')}"
+    except Exception:
+        return str(d)

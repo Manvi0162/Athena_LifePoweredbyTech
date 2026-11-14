@@ -4,10 +4,12 @@ import {Alert,Text,View} from 'react-native';
 import {router} from 'expo-router';
 import {useApp} from '../src/context';
 import {usePattern} from '../src/pattern';
-import {Btn,Card,ChoiceChips,Field,Label,Note,Page,readError} from '../src/ui';
+import {Btn,Card,ChoiceChips,Dropdown,Field,Label,Note,Page,readError} from '../src/ui';
 import {C,S} from '../src/theme';
 
 const steps=['Household','Daily life','Priorities','Review'];
+const TARIFF_CLASSES=['Domestic','Industrial'];
+const tariffClass=(v?:string)=>TARIFF_CLASSES.find(x=>x.toLowerCase()===String(v||'').trim().toLowerCase())||'Domestic';
 const titles=['First, your household','Tell us about daily life','Set your household priorities','Review your answers'];
 
 export default function Onboarding(){
@@ -18,8 +20,8 @@ export default function Onboarding(){
   const [name,setName]=useState(h?.name||'My household');
   const [members,setMembers]=useState(String(h?.members||4));
   const [type,setType]=useState(h?.home_type||'House');
-  const [water,setWater]=useState(h?.water_tariff||'Domestic');
-  const [electricity,setElectricity]=useState(h?.electricity_tariff||'Domestic');
+  const [water,setWater]=useState(tariffClass(h?.water_tariff));
+  const [electricity,setElectricity]=useState(tariffClass(h?.electricity_tariff));
   const [budget,setBudget]=useState(String(h?.monthly_target||15000));
   const [diet,setDiet]=useState(h?.diet||'No preference');
   const [allergies,setAllergies]=useState(h?.allergies||'');
@@ -79,8 +81,10 @@ export default function Onboarding(){
         value={diet} onChange={setDiet}/>
       <Field label={t('Allergies or ingredients to avoid (optional)')} value={allergies}
         onChangeText={setAllergies} placeholder={t('Add any ingredients')}/>
-      <Field label={t('Water tariff class')} value={water} onChangeText={setWater}/>
-      <Field label={t('Electricity tariff class')} value={electricity} onChangeText={setElectricity}/>
+      <Dropdown label={t('Water tariff class')} value={water} onChange={setWater}
+        options={TARIFF_CLASSES.map(v=>({value:v,label:t(v)}))}/>
+      <Dropdown label={t('Electricity tariff class')} value={electricity} onChange={setElectricity}
+        options={TARIFF_CLASSES.map(v=>({value:v,label:t(v)}))}/>
       <Note>{t('Tariff categories are household notes, not a verified tariff calculation.')}</Note>
     </Card>:null}
 
@@ -91,8 +95,8 @@ export default function Onboarding(){
       <Summary label={t('Daily life')} value={waterHabit||appliances?t('Your household habits are saved'):t('No optional habits added')}/>
       <Summary label={t('Monthly target')} value={`MUR ${Number(budget||0).toLocaleString('en-MU')}`}/>
       <Summary label={t('Food preference')} value={diet}/>
-      <Summary label={t('Water tariff note')} value={water}/>
-      <Summary label={t('Electricity tariff note')} value={electricity}/>
+      <Summary label={t('Water tariff class')} value={t(water)}/>
+      <Summary label={t('Electricity tariff class')} value={t(electricity)}/>
       <View style={{backgroundColor:C.blue,borderRadius:13,padding:12}}>
         <Note>{t('Forecasts still need real bills. These answers do not measure current utility use or verify tariff rates.')}</Note>
       </View>

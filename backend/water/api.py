@@ -17,6 +17,7 @@ from . import assessment as A
 from . import forecast as F
 from . import scenarios as SC
 from .auth import err, require_login
+from core.errors import nice_date
 
 try:                                   # merged backend: also write shared tables (core/sync.py)
     from core import sync
@@ -149,11 +150,12 @@ def list_bills():
 
 def _save_bill(s, b: BillIn, replace_id=None):
     if b.end > F.today(s):
-        err(422, "validation_error", f"Bill end date {b.end} is in the future")
+        err(422, "validation_error", f"The bill ends on {nice_date(b.end)}, which is in the future. Check the end date on your bill.")
     for x in s["bills"]:
         if x["id"] != replace_id and date.fromisoformat(x["start"]) < b.end and b.start < date.fromisoformat(x["end"]):
-            err(409, "overlap", f"This bill overlaps the one from {x['start']} to {x['end']}. "
-                                "Correct the dates, or replace that bill on purpose.", {"bill_id": x["id"]})
+            err(409, "overlap", f"You already added a water bill for {nice_date(x['start'])} to {nice_date(x['end'])}, and these dates "
+                                f"({nice_date(b.start)} to {nice_date(b.end)}) overlap it. Check the dates on the bill, or delete "
+                                "the old bill in Utilities first.", {"bill_id": x["id"], "start": x["start"], "end": x["end"]})
     bill = {"id": replace_id or uuid.uuid4().hex[:8], "start": b.start.isoformat(), "end": b.end.isoformat(),
             "m3": b.m3, "amount_rs": b.amount_rs, "start_reading": b.start_reading, "end_reading": b.end_reading,
             "ocr_id": b.ocr_id, "source": "confirmed"}
@@ -228,20 +230,20 @@ def list_readings():
 def add_reading(r: ReadingIn):
     s = store.load()
     if r.date > F.today(s):
-        err(422, "validation_error", f"Reading date {r.date} is in the future")
+        err(422, "validation_error", f"{nice_date(r.date)} is in the future. Use today's date or earlier.")
     bl = F.bills(s)
     if bl and r.date <= date.fromisoformat(bl[-1]["end"]):
-        err(422, "validation_error", f"Readings are for after your last bill (which ends {bl[-1]['end']}).")
+        err(422, "validation_error", f"Your last bill already covers up to {nice_date(bl[-1]['end'])}. Add a meter reading taken after that date.")
     if any(x["date"] == r.date.isoformat() for x in s.get("readings", [])):
-        err(409, "duplicate", f"There is already a reading for {r.date}. Delete it first.")
+        err(409, "duplicate", f"You already added a reading for {nice_date(r.date)}. Delete that one first if it was wrong.")
     earlier = [x["index_m3"] for x in s.get("readings", []) if x["date"] < r.date.isoformat()]
     if bl and bl[-1].get("end_reading") is not None:
         earlier.append(bl[-1]["end_reading"])
     if earlier and r.index_m3 < max(earlier):
-        err(422, "validation_error", f"The meter cannot go backwards: {r.index_m3:g} is below the previous reading {max(earlier):g}.")
+        err(422, "validation_error", f"This number ({r.index_m3:g}) is lower than your previous reading ({max(earlier):g}). A meter only goes up, so check the number.")
     later = [x["index_m3"] for x in s.get("readings", []) if x["date"] > r.date.isoformat()]
     if later and r.index_m3 > min(later):
-        err(422, "validation_error", "This reading is higher than a later reading. Check the date and number.")
+        err(422, "validation_error", "This number is higher than a reading you took later. Check the date and the number.")
     reading = {"id": uuid.uuid4().hex[:8], "date": r.date.isoformat(), "index_m3": r.index_m3}
     if sync:
         reading["db_id"] = sync.mirror_reading("water", r.index_m3, reading["date"])
