@@ -14,7 +14,11 @@ French and Kreol Morisien.
 | **Backend** | One Python FastAPI service (`backend/`) on Render, Supabase (PostgreSQL + Auth) |
 | **Tests** | 123 automated backend tests (`pytest`), plus browser end-to-end checks with Playwright |
 
-Submission links (filled in by the team): APK / Expo link: `TO FILL` · Backup demo video: `TO FILL` · Pitch slides: `TO FILL`
+**Deliverables** (in [`deliverables/`](deliverables/)):
+[Pitch slides](deliverables/pitch-slides/LiveBetter_Pitch_Slides.pptx) ·
+[Backup demo video (1 min 54 s)](deliverables/demo-video/LiveBetter_Demo_Video.mp4) ·
+[Decision log](deliverables/decision-log/LiveBetter_Decision_Log.pdf) ·
+APK / Expo link: `TO FILL`
 
 ---
 
@@ -203,21 +207,23 @@ by a native speaker.
 
 ## 8. Decision log
 
-Times are Mauritius time (UTC+4), from our commit history.
+The official decision log is [`deliverables/decision-log/LiveBetter_Decision_Log.pdf`](deliverables/decision-log/LiveBetter_Decision_Log.pdf)
+(13 Nov 1:00 PM to 14 Nov 9:00 AM, Mauritius time, UTC+4). Summary:
 
-| When | Decision | Why |
+| Date and time | Decision | Reason / outcome |
 |---|---|---|
-| Fri 12:46 | Theme 3, one user: a Mauritian family of four managing water, electricity and food on a budget | A specific person with a real monthly pain, rather than "everyone in Mauritius" |
-| Fri 14:52 | Use the official CWA and CEB tariffs, checked against our own real bills, instead of a flat price per unit | Rising blocks are the real cause of bill surprises; a flat price would give wrong numbers |
-| Fri 18:14 | Statistics and rules, not machine learning, with honest statuses ("preliminary" / "better supported") | One household has too few bills to train a model; every rupee must be explainable |
-| Fri 20:51 | One FastAPI backend with each teammate's module and one shared login and household | Five separate services could not share data or be deployed in 24 hours |
-| Fri 23:01 | Surprise card "Misuse": pattern for 5 sensitive actions, lockout, owner alert, 24-hour undo, optional Microsoft Authenticator | The real risk is someone else using the owner's unlocked phone; a login password alone does not stop that |
-| Sat 01:27 | AI never calculates: Gemini only reads photos and words text, and any AI sentence with a number we did not calculate is replaced | Trust: a wrong number on a family's bill is worse than a plain sentence |
-| Sat 01:35 | Redesign: remove every screen element without a backend behind it, remove expiry dates, bill photo fills the form | A smaller app that works end to end beats more features that don't |
-| Sat 03:18 | Whole app in English, French and Kreol Morisien | Mauritian households read all three; numbers never change with the language |
-| Sat 04:35 | Deploy on Render + Supabase, APK with EAS, with contingency plans (local backend, Expo Go, offline demo, video) | The app must work on a real phone during judging |
-| Sat 05:21 | Coach becomes a conversation that asks follow-up questions, and applied plans change the predicted bills | Users do not write complete what-if questions; a plan should visibly change the forecast |
-| Sat 06:17 | Accuracy shown as MAPE for both water and electricity (fixed the electricity average to absolute errors) | A percentage everyone understands, comparable between m³ and kWh and between homes |
+| 13 Nov 1:15 PM | 1. One integrated household-management app | Utility costs, groceries and food waste are connected problems; one app instead of three |
+| 13 Nov 2:00 PM | 2. Work divided into Water, Electricity, Food and a central AI Coach, plus app and integration | Each module owned by one teammate, combined by the coach |
+| 13 Nov 3:10 PM | 3. Unified cloud architecture: React Native / Expo, FastAPI, Supabase PostgreSQL, Render | A shared backend and household identity connect the modules and support mobile deployment |
+| 13 Nov 4:30 PM | 4. Explainable AI with verifiable calculations | AI explanations must be grounded in values calculated by the modules; no invented savings |
+| 13 Nov 6:15 PM | 5. Grounded in the Mauritian context | CWA and CEB tariff rules, local temperature data, water-use research, household bills, three languages |
+| 13 Nov 8:00 PM | 6. Surprise card MISUSE | Server-verified security pattern for sensitive actions, optional Microsoft Authenticator, lockouts, alerts, activity logs, 24-hour reset recovery |
+| 13 Nov 9:40 PM | 7. Privacy in document processing | LLM extraction of only the needed bill / receipt fields instead of full-page OCR, with user confirmation before saving |
+| 14 Nov 12:30 AM | 8. Rule-based AI Coach | Rules calculate the what-if; the language model helps with conversation and wording; follow-up questions when inputs are missing |
+| 14 Nov 4:15 AM | 9. Accessibility and understandable feedback | English, French and Kreol Morisien, clear error messages, PDF-exportable activity records |
+| 14 Nov 9:00 AM | 10. Final testing cycle | Modules, AI Coach, app-to-backend integration, data flows and MISUSE safeguards tested; fallback demo options prepared |
+
+The commit history on GitHub shows when each of these was built.
 
 ## 9. How to run it
 
@@ -271,6 +277,7 @@ PDF, language switch → Settings: wrong pattern → Home alert → log in with 
 | `research/big_brain/` | Manvi's original notebooks for the recommendation engine (the backend uses the ported functions) |
 | `LiveBetter_Frontend_Starter/` | The starter project and installation notes from the first hours |
 | `kentish/` | Kentish's first UI prototype |
+| `deliverables/` | Hackathon submission files: `pitch-slides/` (6-slide deck), `demo-video/` (backup demo video), `decision-log/` (decision log PDF) |
 | `database` branch | Supabase schema extensions, the atomic RPC for the recommendation engine, fictional demo seeds |
 
 Screens: `/welcome`, `/login`, `/register`, `/security`, `/onboarding`, and the tabs `/home`, `/utilities` (→ `/water`,
